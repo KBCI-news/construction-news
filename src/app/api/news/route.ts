@@ -27,11 +27,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("articles")
-    .select(
-      "link, original_link, title, description, pub_date, categories",
-    )
+    .select("link,original_link,title,description,pub_date,categories")
     .order("pub_date", { ascending: false })
-    .limit(MAX_ITEMS);
+    .range(0, MAX_ITEMS - 1);
 
   if (error) {
     return NextResponse.json(
