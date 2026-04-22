@@ -77,11 +77,17 @@ export default function NewsList() {
         return json;
       })
       .then((json) => {
-        setData(
-          searchQuery
-            ? { mode: "search", q: searchQuery, items: json.items ?? [] }
-            : { mode: "all", items: json.items ?? [] },
-        );
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const filtered = (json.items ?? []).filter((it: NaverNewsItem) => {
+            const title = stripHtml(it.title).toLowerCase();
+            const desc = stripHtml(it.description ?? "").toLowerCase();
+            return title.includes(q) || desc.includes(q);
+          });
+          setData({ mode: "search", q: searchQuery, items: filtered });
+        } else {
+          setData({ mode: "all", items: json.items ?? [] });
+        }
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
