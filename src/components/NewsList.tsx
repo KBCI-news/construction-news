@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { EnrichedNewsItem } from "@/app/api/naver-news/all/route";
+import type { NewsResponseItem } from "@/app/api/news/route";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
+
+type EnrichedNewsItem = NewsResponseItem;
 import { CATEGORIES } from "@/lib/categories";
 import {
   dateGroupOf,
@@ -66,7 +68,7 @@ export default function NewsList() {
     const controller = new AbortController();
     const url = searchQuery
       ? `/api/naver-news?q=${encodeURIComponent(searchQuery)}&display=100&sort=date`
-      : "/api/naver-news/all";
+      : "/api/news";
 
     setLoading(true);
     setData(null);
@@ -94,7 +96,10 @@ export default function NewsList() {
     return () => controller.abort();
   }, [searchQuery]);
 
-  const allItems = data?.mode === "all" ? data.items : [];
+  const allItems = useMemo(
+    () => (data?.mode === "all" ? data.items : []),
+    [data],
+  );
 
   const featured = useMemo(() => {
     return allItems

@@ -9,7 +9,8 @@
       "Bash(mv /tmp/kbci-news-tmp/* \"/Users/kaneseo/KBCI 뉴스/\")",
       "Bash(rmdir /tmp/kbci-news-tmp)",
       "Bash(setopt dotglob *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm install *)"
     ]
   }
 }
