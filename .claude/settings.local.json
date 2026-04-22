@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes create-next-app@14 . --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --use-npm --no-turbo)",
+      "Read(//private/tmp/**)",
+      "Bash(rm -rf kbci-news-tmp)",
+      "Bash(npx --yes create-next-app@14 kbci-news-tmp --typescript --tailwind --app --eslint --src-dir --import-alias \"@/*\" --use-npm)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv /tmp/kbci-news-tmp/* \"/Users/kaneseo/KBCI 뉴스/\")",
+      "Bash(rmdir /tmp/kbci-news-tmp)",
+      "Bash(setopt dotglob *)",
+      "Bash(npm run *)"
+    ]
+  }
+}
