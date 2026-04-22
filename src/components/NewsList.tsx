@@ -353,12 +353,12 @@ function FeaturedSection({
       ) : (
         <div
           ref={scrollRef}
-          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0"
+          className="flex flex-col gap-3 md:flex-row md:snap-x md:snap-mandatory md:overflow-x-auto md:scroll-smooth md:pb-2 md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden"
         >
           {items.map((item) => (
             <div
               key={item.link}
-              className="w-[85%] shrink-0 snap-start md:w-[calc((100%-1.5rem)/3)] lg:w-[calc((100%-2.25rem)/4)]"
+              className="md:w-[calc((100%-1.5rem)/3)] md:shrink-0 md:snap-start lg:w-[calc((100%-2.25rem)/4)]"
             >
               <NewsCard item={item} />
             </div>
@@ -665,11 +665,11 @@ function NewsCard({ item }: { item: AnyItem }) {
 
 function SkeletonGrid() {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="flex flex-col gap-3 md:flex-row">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="animate-pulse rounded-xl border border-gray-200 bg-white p-4"
+          className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5 md:flex-1"
         >
           <div className="h-3 w-32 rounded bg-gray-200" />
           <div className="mt-3 h-5 w-3/4 rounded bg-gray-200" />
