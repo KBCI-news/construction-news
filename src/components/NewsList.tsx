@@ -4,19 +4,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, FEATURED_KEYWORDS } from "@/lib/categories";
 import { filterFeatured, type TimeRange } from "@/lib/featured";
-import {
-  dateGroupOf,
-  formatRelative,
-  hostOf,
-  stripHtml,
-} from "@/lib/format";
+import { formatRelative, hostOf, stripHtml } from "@/lib/format";
 
 type EnrichedNewsItem = NewsResponseItem;
 
 const ALL_TAB = "__all__";
-const GROUP_ORDER = ["오늘", "어제", "이번 주", "이전"];
+
+const relevanceScore = (item: EnrichedNewsItem): number => {
+  const text = stripHtml(item.title);
+  const featuredBonus = FEATURED_KEYWORDS.some((k) => text.includes(k))
+    ? 5
+    : 0;
+  return item.categories.length * 2 + featuredBonus;
+};
 
 const CATEGORY_COLORS: Record<string, string> = {
   "debt-collection": "bg-blue-50 text-blue-700 ring-blue-100",
@@ -121,22 +123,17 @@ export default function NewsList() {
   }, [allItems]);
 
   const tabFiltered = useMemo(() => {
-    if (activeTab === ALL_TAB) return allItems;
-    return allItems.filter((it) => it.categories.includes(activeTab));
+    const base =
+      activeTab === ALL_TAB
+        ? allItems
+        : allItems.filter((it) => it.categories.includes(activeTab));
+    return base.slice().sort((a, b) => {
+      const sa = relevanceScore(a);
+      const sb = relevanceScore(b);
+      if (sb !== sa) return sb - sa;
+      return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
+    });
   }, [allItems, activeTab]);
-
-  const grouped = useMemo(() => {
-    const groups = new Map<string, AnyItem[]>();
-    for (const item of tabFiltered) {
-      const g = dateGroupOf(item.pubDate);
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g)!.push(item);
-    }
-    return GROUP_ORDER.map((g) => ({
-      group: g,
-      items: groups.get(g) ?? [],
-    })).filter((g) => g.items.length > 0);
-  }, [tabFiltered]);
 
   const onSubmitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,7 +220,7 @@ export default function NewsList() {
             counts={counts}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            grouped={grouped}
+            items={tabFiltered}
             loading={loading}
           />
         </>
@@ -469,21 +466,21 @@ function FullFeed({
   counts,
   activeTab,
   onTabChange,
-  grouped,
+  items,
   loading,
 }: {
   sectionRef: React.RefObject<HTMLElement>;
   counts: Record<string, number>;
   activeTab: string;
   onTabChange: (t: string) => void;
-  grouped: { group: string; items: AnyItem[] }[];
+  items: AnyItem[];
   loading: boolean;
 }) {
   return (
     <section ref={sectionRef} className="scroll-mt-20">
       <SectionHeader
         title="전체 뉴스 피드"
-        subtitle="모든 카테고리의 최신 뉴스를 한 번에"
+        subtitle="관련도 높은 순으로 정렬"
       />
 
       <div className="mb-5 flex flex-wrap gap-2">
@@ -506,27 +503,12 @@ function FullFeed({
 
       {loading ? (
         <SkeletonList />
-      ) : grouped.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState message="표시할 뉴스가 없습니다." />
       ) : (
-        <div className="space-y-8">
-          {grouped.map(({ group, items }) => (
-            <div key={group} className="space-y-3">
-              <div className="flex items-center gap-3">
-                <h3 className="text-[15px] font-bold uppercase tracking-wider text-gray-500">
-                  {group}
-                </h3>
-                <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-[13px] text-gray-400">
-                  {items.length}건
-                </span>
-              </div>
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <NewsCard key={item.link} item={item} />
-                ))}
-              </div>
-            </div>
+        <div className="space-y-2">
+          {items.map((item) => (
+            <NewsCard key={item.link} item={item} />
           ))}
         </div>
       )}
