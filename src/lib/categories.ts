@@ -39,3 +39,12 @@ export const CATEGORIES: Category[] = [
 
 export const getCategory = (id: string): Category | undefined =>
   CATEGORIES.find((c) => c.id === id);
+
+export const FEATURED_KEYWORDS = [
+  "KB신용정보",
+  "채권추심",
+  "신용조사",
+  "신용정보법",
+  "채권추심법",
+  "공인전자문서",
+];

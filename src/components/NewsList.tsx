@@ -5,7 +5,7 @@ import type { NewsResponseItem } from "@/app/api/news/route";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 type EnrichedNewsItem = NewsResponseItem;
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, FEATURED_KEYWORDS } from "@/lib/categories";
 import {
   dateGroupOf,
   formatRelative,
@@ -104,14 +104,16 @@ export default function NewsList() {
   const featured = useMemo(() => {
     return allItems
       .filter((it) => inRange(it.pubDate, featuredRange))
-      .slice()
-      .sort((a, b) => {
-        if (b.categories.length !== a.categories.length) {
-          return b.categories.length - a.categories.length;
-        }
-        return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
+      .filter((it) => {
+        const text = stripHtml(it.title);
+        return FEATURED_KEYWORDS.some((k) => text.includes(k));
       })
-      .slice(0, 8);
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime(),
+      )
+      .slice(0, 50);
   }, [allItems, featuredRange]);
 
   const categoryTops = useMemo(() => {
@@ -298,27 +300,31 @@ function FeaturedSection({
   onRangeChange: (r: TimeRange) => void;
   loading: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollByPage = (dir: 1 | -1) => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
   };
+  const visibleItems = expanded ? items : items.slice(0, 8);
   return (
     <section>
       <SectionHeader
         title="주요 뉴스"
         subtitle={
           range === "daily"
-            ? "지난 24시간 동안 여러 키워드에 걸친 이슈"
-            : "이번 주 여러 키워드에 걸친 이슈"
+            ? "지난 24시간 핵심 키워드 이슈"
+            : "지난 7일 핵심 키워드 이슈"
         }
       >
-        <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-1 md:flex">
-            <ArrowButton onClick={() => scrollByPage(-1)} direction="left" />
-            <ArrowButton onClick={() => scrollByPage(1)} direction="right" />
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {!expanded && (
+            <div className="hidden items-center gap-1 md:flex">
+              <ArrowButton onClick={() => scrollByPage(-1)} direction="left" />
+              <ArrowButton onClick={() => scrollByPage(1)} direction="right" />
+            </div>
+          )}
           <div className="inline-flex rounded-lg bg-gray-100 p-1">
             <button
               onClick={() => onRangeChange("daily")}
@@ -341,6 +347,14 @@ function FeaturedSection({
               주간
             </button>
           </div>
+          {items.length > 8 && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50 hover:text-gray-900"
+            >
+              {expanded ? "접기 ↑" : `더보기 ${items.length} →`}
+            </button>
+          )}
         </div>
       </SectionHeader>
 
@@ -350,15 +364,21 @@ function FeaturedSection({
         <EmptyState
           message={`${range === "daily" ? "오늘" : "이번 주"} 표시할 주요 뉴스가 없습니다.`}
         />
+      ) : expanded ? (
+        <div className="space-y-3">
+          {visibleItems.map((item) => (
+            <NewsCard key={item.link} item={item} />
+          ))}
+        </div>
       ) : (
         <div
           ref={scrollRef}
-          className="flex flex-col gap-3 md:flex-row md:snap-x md:snap-mandatory md:overflow-x-auto md:scroll-smooth md:pb-2 md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden"
+          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0"
         >
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <div
               key={item.link}
-              className="md:w-[calc((100%-1.5rem)/3)] md:shrink-0 md:snap-start lg:w-[calc((100%-2.25rem)/4)]"
+              className="w-[85%] shrink-0 snap-start md:w-[calc((100%-1.5rem)/3)] lg:w-[calc((100%-2.25rem)/4)]"
             >
               <NewsCard item={item} />
             </div>
