@@ -6,15 +6,6 @@ import { CATEGORIES, FEATURED_KEYWORDS } from "@/lib/categories";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
 import { NewsCard } from "@/components/NewsCard";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "debt-collection": "bg-blue-50 text-blue-700 ring-blue-100",
-  "credit-investigation": "bg-emerald-50 text-emerald-700 ring-emerald-100",
-  "e-document": "bg-violet-50 text-violet-700 ring-violet-100",
-  "finance-law": "bg-amber-50 text-amber-700 ring-amber-100",
-  "labor-law": "bg-rose-50 text-rose-700 ring-rose-100",
-  kbci: "bg-slate-100 text-slate-700 ring-slate-200",
-};
-
 const labelOf = (id: string) =>
   CATEGORIES.find((c) => c.id === id)?.label ?? id;
 
@@ -99,33 +90,39 @@ export default function CategoryPageClient({
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+    <div className="space-y-8">
+      <div className="border-b-2 border-gray-900 pb-3">
+        <p className="text-[11px] font-bold tracking-widest text-[#FFB81C]">
+          KBCI NEWS · {categoryLabel.toUpperCase()}
+        </p>
+        <h1 className="mt-2 text-[28px] font-extrabold tracking-tight text-gray-900 sm:text-[36px]">
           {categoryLabel}
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-[12px] text-gray-500 sm:text-[13px]">
           관련도 높은 순 ·{" "}
           {loading ? "..." : `총 ${categoryItems.length}건`}
         </p>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        <div className="border-l-4 border-rose-500 bg-rose-50 p-4 text-sm text-rose-700">
           {error}
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
-        <div className="space-y-3 lg:col-span-2">
+      <div className="grid gap-10 lg:grid-cols-3 lg:gap-12">
+        <div className="lg:col-span-2">
           {loading ? (
             <SkeletonList />
           ) : categoryItems.length === 0 ? (
             <EmptyState />
           ) : (
             <>
-              <HeroCard item={categoryItems[0]} />
-              <div className="space-y-2">
+              <HeroArticle item={categoryItems[0]} />
+              {categoryItems.length > 1 && (
+                <div className="mt-6 border-t border-gray-200" />
+              )}
+              <div className="divide-y divide-gray-200">
                 {categoryItems.slice(1).map((item) => (
                   <NewsCard key={item.link} item={item} />
                 ))}
@@ -134,50 +131,49 @@ export default function CategoryPageClient({
           )}
         </div>
 
-        <aside className="lg:col-span-1">
-          <div className="lg:sticky lg:top-[160px]">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5">
-              <h2 className="text-sm font-bold text-gray-900">
+        <aside>
+          <div className="lg:sticky lg:top-[140px]">
+            <div className="border-b-2 border-gray-900 pb-2">
+              <h2 className="text-[12px] font-bold tracking-widest text-gray-900">
                 주요 뉴스 TOP 5
               </h2>
-              <p className="mt-1 text-xs text-gray-500">관련도 높은 순</p>
-              {loading ? (
-                <ul className="mt-4 space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <li key={i} className="animate-pulse">
-                      <div className="h-3 w-16 rounded bg-gray-100" />
-                      <div className="mt-1.5 h-4 w-full rounded bg-gray-200" />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <ol className="mt-4 space-y-4">
-                  {topRanked.map((item, idx) => (
-                    <li key={item.link}>
-                      <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex gap-3"
-                      >
-                        <span className="shrink-0 text-base font-extrabold text-[#FFB81C]">
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[11px] text-gray-500">
-                            {hostOf(item.originallink)} ·{" "}
-                            {formatRelative(item.pubDate)}
-                          </div>
-                          <p className="mt-0.5 line-clamp-2 text-[14px] font-medium leading-snug text-gray-800 group-hover:text-gray-600">
-                            {stripHtml(item.title)}
-                          </p>
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                </ol>
-              )}
             </div>
+            {loading ? (
+              <ul className="mt-5 space-y-5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <li key={i} className="animate-pulse">
+                    <div className="h-4 w-full rounded bg-gray-200" />
+                    <div className="mt-1 h-3 w-24 rounded bg-gray-100" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ol className="mt-5 space-y-5">
+                {topRanked.map((item, idx) => (
+                  <li key={item.link}>
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex gap-3"
+                    >
+                      <span className="shrink-0 text-[16px] font-extrabold tabular-nums text-[#FFB81C]">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-[14px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                          {stripHtml(item.title)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          {hostOf(item.originallink)} —{" "}
+                          {formatRelative(item.pubDate)}
+                        </p>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         </aside>
       </div>
@@ -185,53 +181,41 @@ export default function CategoryPageClient({
   );
 }
 
-function HeroCard({ item }: { item: NewsResponseItem }) {
-  const categories = item.categories;
+function HeroArticle({ item }: { item: NewsResponseItem }) {
   return (
     <a
       href={item.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="group block rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-[#FFB81C]/60 hover:shadow-md sm:p-8"
+      className="group block"
     >
-      <div className="text-[13px] text-gray-500">
+      {item.categories.length > 0 && (
+        <div className="mb-3 text-[11px] font-bold tracking-wider text-[#FFB81C]">
+          {item.categories.map((id) => labelOf(id)).join(" · ")}
+        </div>
+      )}
+      <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[32px]">
+        {stripHtml(item.title)}
+      </h2>
+      <p className="mt-3 text-[12px] text-gray-500 sm:text-[13px]">
         <span className="font-medium text-gray-700">
           {hostOf(item.originallink)}
         </span>
-        <span className="mx-2">·</span>
+        <span className="mx-1.5">—</span>
         <span>{formatRelative(item.pubDate)}</span>
-      </div>
-      <h2 className="mt-3 text-xl font-bold leading-snug text-gray-900 group-hover:text-gray-700 sm:text-2xl">
-        {stripHtml(item.title)}
-      </h2>
-      {categories.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-1.5">
-          {categories.map((id) => (
-            <span
-              key={id}
-              className={`rounded-md px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
-                CATEGORY_COLORS[id] ?? "bg-gray-100 text-gray-700"
-              }`}
-            >
-              {labelOf(id)}
-            </span>
-          ))}
-        </div>
-      )}
+      </p>
     </a>
   );
 }
 
 function SkeletonList() {
   return (
-    <div className="space-y-2">
+    <div className="space-y-6">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5"
-        >
+        <div key={i} className="animate-pulse border-b border-gray-200 pb-6">
           <div className="h-3 w-32 rounded bg-gray-200" />
           <div className="mt-3 h-5 w-3/4 rounded bg-gray-200" />
+          <div className="mt-2 h-3 w-32 rounded bg-gray-100" />
         </div>
       ))}
     </div>
@@ -240,7 +224,7 @@ function SkeletonList() {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+    <div className="border-y-2 border-gray-200 py-16 text-center text-sm text-gray-500">
       이 카테고리의 뉴스가 없습니다.
     </div>
   );

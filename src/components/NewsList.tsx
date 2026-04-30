@@ -7,6 +7,7 @@ import type { NaverNewsItem } from "@/app/api/naver-news/route";
 import { CATEGORIES, FEATURED_KEYWORDS } from "@/lib/categories";
 import { filterFeatured, type TimeRange } from "@/lib/featured";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
+import { NewsCard } from "@/components/NewsCard";
 
 type EnrichedNewsItem = NewsResponseItem;
 
@@ -27,24 +28,6 @@ const normalizeTitle = (title: string): string => {
     .replace(/\([^)]*\)/g, "")
     .replace(/[^\p{L}\p{N}]/gu, "")
     .slice(0, 40);
-};
-
-const CATEGORY_COLORS: Record<string, string> = {
-  "debt-collection": "bg-blue-50 text-blue-700 ring-blue-100",
-  "credit-investigation": "bg-emerald-50 text-emerald-700 ring-emerald-100",
-  "e-document": "bg-violet-50 text-violet-700 ring-violet-100",
-  "finance-law": "bg-amber-50 text-amber-700 ring-amber-100",
-  "labor-law": "bg-rose-50 text-rose-700 ring-rose-100",
-  kbci: "bg-slate-100 text-slate-700 ring-slate-200",
-};
-
-const DOT_COLORS: Record<string, string> = {
-  "debt-collection": "bg-blue-500",
-  "credit-investigation": "bg-emerald-500",
-  "e-document": "bg-violet-500",
-  "finance-law": "bg-amber-500",
-  "labor-law": "bg-rose-500",
-  kbci: "bg-slate-500",
 };
 
 const labelOf = (id: string) =>
@@ -205,7 +188,7 @@ export default function NewsList() {
           {loading ? (
             <SkeletonList />
           ) : data?.mode === "search" && data.items.length > 0 ? (
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-200">
               {data.items.map((item) => (
                 <NewsCard key={item.link} item={item} />
               ))}
@@ -258,10 +241,10 @@ function SearchBar({
   return (
     <form onSubmit={onSubmit} className="relative">
       <svg
-        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+        className="pointer-events-none absolute left-1 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
         fill="none"
         viewBox="0 0 24 24"
-        strokeWidth={1.8}
+        strokeWidth={2}
         stroke="currentColor"
       >
         <path
@@ -275,11 +258,11 @@ function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="키워드를 입력해 검색하세요"
-        className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-11 pr-20 text-[15px] font-medium text-gray-900 shadow-sm outline-none transition-all placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] focus:shadow-[0_0_0_4px_rgba(255,184,28,0.15)] sm:py-4 sm:pl-12 sm:pr-32 sm:text-[17px]"
+        className="w-full border-b-2 border-gray-300 bg-white py-3 pl-9 pr-20 text-[16px] font-semibold text-gray-900 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] sm:text-[18px]"
       />
       <button
         type="submit"
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-gray-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700 sm:px-5 sm:py-2.5 sm:text-base"
+        className="absolute right-0 top-1/2 -translate-y-1/2 px-3 py-2 text-[13px] font-bold tracking-wider text-gray-900 hover:text-[#FFB81C] sm:text-[14px]"
       >
         검색
       </button>
@@ -313,23 +296,23 @@ function HeroSection({
         }
       >
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="inline-flex rounded-lg bg-gray-100 p-1">
+          <div className="inline-flex border border-gray-300 text-[13px]">
             <button
               onClick={() => onRangeChange("daily")}
-              className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 font-bold tracking-wider transition-colors ${
                 range === "daily"
-                  ? "bg-white text-gray-900 shadow-sm ring-1 ring-[#FFB81C]/40"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-gray-900 text-white"
+                  : "bg-white text-gray-600 hover:text-gray-900"
               }`}
             >
               일간
             </button>
             <button
               onClick={() => onRangeChange("weekly")}
-              className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              className={`border-l border-gray-300 px-3 py-1.5 font-bold tracking-wider transition-colors ${
                 range === "weekly"
-                  ? "bg-white text-gray-900 shadow-sm ring-1 ring-[#FFB81C]/40"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-gray-900 text-white"
+                  : "bg-white text-gray-600 hover:text-gray-900"
               }`}
             >
               주간
@@ -337,7 +320,7 @@ function HeroSection({
           </div>
           <Link
             href="/featured"
-            className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50 hover:text-gray-900"
+            className="border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#FFB81C]"
           >
             + 더보기
           </Link>
@@ -351,91 +334,98 @@ function HeroSection({
           message={`${range === "daily" ? "오늘" : "이번 주"} 표시할 주요 뉴스가 없습니다.`}
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-          <div className="space-y-3 lg:col-span-2">
+        <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
+          <div className="lg:col-span-2">
             <a
               href={main.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="group block rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-[#FFB81C]/60 hover:shadow-md sm:p-8"
+              className="group block"
             >
-              <div className="text-[13px] text-gray-500">
+              {main.categories.length > 0 && (
+                <div className="mb-3 text-[11px] font-bold tracking-wider text-[#FFB81C]">
+                  {main.categories.map((id) => labelOf(id)).join(" · ")}
+                </div>
+              )}
+              <h3 className="text-[26px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[32px]">
+                {stripHtml(main.title)}
+              </h3>
+              <p className="mt-3 text-[12px] text-gray-500 sm:text-[13px]">
                 <span className="font-medium text-gray-700">
                   {hostOf(main.originallink)}
                 </span>
-                <span className="mx-2">·</span>
+                <span className="mx-1.5">—</span>
                 <span>{formatRelative(main.pubDate)}</span>
-              </div>
-              <h3 className="mt-3 text-[22px] font-bold leading-snug text-gray-900 group-hover:text-gray-700 sm:text-[26px]">
-                {stripHtml(main.title)}
-              </h3>
+              </p>
             </a>
 
             {subStories.length > 0 && (
-              <ul className="divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                {subStories.map((item) => (
-                  <li key={item.link}>
-                    <a
-                      href={item.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block px-5 py-4 transition-colors hover:bg-gray-50"
-                    >
-                      <p className="text-[16px] font-semibold leading-snug text-gray-900 group-hover:text-gray-700">
-                        {stripHtml(item.title)}
-                      </p>
-                      <p className="mt-1.5 text-[12px] text-gray-500">
-                        <span className="font-medium text-gray-700">
-                          {hostOf(item.originallink)}
-                        </span>
-                        <span className="mx-1.5">·</span>
-                        {formatRelative(item.pubDate)}
-                      </p>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <aside>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5">
-              <h3 className="text-sm font-bold text-gray-900">핫뉴스</h3>
-              <p className="mt-1 text-xs text-gray-500">
-                관련도 높은 순 TOP 5
-              </p>
-              {sideStories.length === 0 ? (
-                <p className="mt-4 text-sm text-gray-400">
-                  표시할 뉴스가 없습니다.
-                </p>
-              ) : (
-                <ol className="mt-4 space-y-4">
-                  {sideStories.map((item, idx) => (
+              <>
+                <div className="my-6 border-t border-gray-200" />
+                <ul className="divide-y divide-gray-200">
+                  {subStories.map((item) => (
                     <li key={item.link}>
                       <a
                         href={item.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group flex gap-3"
+                        className="group block py-4 transition-colors hover:bg-gray-50/40"
                       >
-                        <span className="shrink-0 text-base font-extrabold text-[#FFB81C]">
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[14px] font-medium leading-snug text-gray-800 group-hover:text-gray-600">
-                            {stripHtml(item.title)}
-                          </p>
-                          <p className="mt-1 text-[11px] text-gray-500">
-                            {hostOf(item.originallink)} ·{" "}
-                            {formatRelative(item.pubDate)}
-                          </p>
-                        </div>
+                        <p className="text-[16px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                          {stripHtml(item.title)}
+                        </p>
+                        <p className="mt-1.5 text-[11px] text-gray-500">
+                          <span className="font-medium text-gray-700">
+                            {hostOf(item.originallink)}
+                          </span>
+                          <span className="mx-1.5">—</span>
+                          {formatRelative(item.pubDate)}
+                        </p>
                       </a>
                     </li>
                   ))}
-                </ol>
-              )}
+                </ul>
+              </>
+            )}
+          </div>
+
+          <aside>
+            <div className="border-b-2 border-gray-900 pb-2">
+              <h3 className="text-[12px] font-bold tracking-widest text-gray-900">
+                핫뉴스 TOP 5
+              </h3>
             </div>
+            {sideStories.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-400">
+                표시할 뉴스가 없습니다.
+              </p>
+            ) : (
+              <ol className="mt-5 space-y-5">
+                {sideStories.map((item, idx) => (
+                  <li key={item.link}>
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex gap-3"
+                    >
+                      <span className="shrink-0 text-[18px] font-extrabold tabular-nums text-[#FFB81C]">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-[14px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                          {stripHtml(item.title)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          {hostOf(item.originallink)} —{" "}
+                          {formatRelative(item.pubDate)}
+                        </p>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            )}
           </aside>
         </div>
       )}
@@ -477,7 +467,7 @@ function RankedLists({
   return (
     <section>
       <SectionHeader title="뉴스 랭킹" subtitle="다양한 기준으로 보기" />
-      <div className="grid gap-4 md:grid-cols-3 md:gap-6">
+      <div className="grid gap-8 md:grid-cols-3 md:gap-10">
         <RankedColumn
           title="주요 뉴스"
           subtitle="관련도순"
@@ -492,7 +482,7 @@ function RankedLists({
         />
         <RankedColumn
           title="카테고리 핵심"
-          subtitle="카테고리별 대표 1건"
+          subtitle="카테고리별"
           items={topPerCategory}
           loading={loading}
         />
@@ -513,13 +503,17 @@ function RankedColumn({
   loading: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-base font-bold text-gray-900">{title}</h3>
-        <p className="text-[11px] text-gray-500">{subtitle}</p>
+    <div>
+      <div className="border-b-2 border-gray-900 pb-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-[14px] font-bold tracking-widest text-gray-900">
+            {title}
+          </h3>
+          <p className="text-[11px] text-gray-500">{subtitle}</p>
+        </div>
       </div>
       {loading ? (
-        <ul className="mt-4 space-y-4">
+        <ul className="mt-5 space-y-5">
           {Array.from({ length: 5 }).map((_, i) => (
             <li key={i} className="animate-pulse">
               <div className="h-4 w-full rounded bg-gray-200" />
@@ -528,9 +522,9 @@ function RankedColumn({
           ))}
         </ul>
       ) : items.length === 0 ? (
-        <p className="mt-4 text-sm text-gray-400">뉴스가 없습니다.</p>
+        <p className="mt-5 text-sm text-gray-400">뉴스가 없습니다.</p>
       ) : (
-        <ol className="mt-4 space-y-4">
+        <ol className="mt-5 space-y-5">
           {items.map((item, idx) => (
             <li key={item.link}>
               <a
@@ -539,15 +533,15 @@ function RankedColumn({
                 rel="noopener noreferrer"
                 className="group flex gap-3"
               >
-                <span className="shrink-0 text-base font-extrabold text-[#FFB81C]">
-                  {idx + 1}
+                <span className="shrink-0 text-[16px] font-extrabold tabular-nums text-[#FFB81C]">
+                  {String(idx + 1).padStart(2, "0")}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[14px] font-medium leading-snug text-gray-800 group-hover:text-gray-600">
+                  <p className="line-clamp-2 text-[14px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
                     {stripHtml(item.title)}
                   </p>
                   <p className="mt-1 text-[11px] text-gray-500">
-                    {hostOf(item.originallink)} ·{" "}
+                    {hostOf(item.originallink)} —{" "}
                     {formatRelative(item.pubDate)}
                   </p>
                 </div>
@@ -602,82 +596,58 @@ function CategoryHighlights({
   counts: Record<string, number>;
   loading: boolean;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollByCard = (dir: 1 | -1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const firstCard = el.children[0] as HTMLElement | undefined;
-    const cardWidth = firstCard?.offsetWidth ?? el.clientWidth * 0.85;
-    el.scrollBy({ left: dir * (cardWidth + 12), behavior: "smooth" });
-  };
   return (
     <section>
       <SectionHeader
         title="카테고리별 인사이트"
-        subtitle="주제별 최신 뉴스 모음"
-      >
-        <div className="hidden items-center gap-1 md:flex">
-          <ArrowButton onClick={() => scrollByCard(-1)} direction="left" />
-          <ArrowButton onClick={() => scrollByCard(1)} direction="right" />
-        </div>
-      </SectionHeader>
-      <div
-        ref={scrollRef}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0"
-      >
+        subtitle="주제별 최신 뉴스"
+      />
+      <div className="grid gap-8 md:grid-cols-2 md:gap-10 lg:grid-cols-3">
         {CATEGORIES.map((cat) => {
           const items = tops[cat.id] ?? [];
           return (
-            <div
-              key={cat.id}
-              className="flex w-[85%] shrink-0 snap-start flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:border-[#FFB81C]/60 hover:shadow-md md:w-[calc((100%-1.5rem)/3)]"
-            >
+            <div key={cat.id}>
               <Link
                 href={`/category/${cat.id}`}
-                className="flex w-full items-center justify-between gap-2 text-left"
+                className="group flex w-full items-baseline justify-between gap-2 border-b border-gray-300 pb-2"
                 title="전체보기"
               >
-                <h3 className="flex min-w-0 items-center gap-2 text-[15px] font-bold text-gray-900">
-                  <span
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      DOT_COLORS[cat.id] ?? "bg-gray-400"
-                    }`}
-                  />
-                  <span className="truncate">{cat.label}</span>
+                <h3 className="text-[14px] font-bold tracking-widest text-gray-900 group-hover:text-[#FFB81C]">
+                  {cat.label}
                 </h3>
-                <span className="shrink-0 whitespace-nowrap text-[12px] text-gray-400">
+                <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-gray-400 group-hover:text-[#FFB81C]">
                   {counts[cat.id] ?? 0}건 →
                 </span>
               </Link>
               {loading ? (
-                <ul className="mt-3 space-y-2.5">
+                <ul className="mt-4 space-y-4">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <li key={i} className="animate-pulse">
-                      <div className="h-3 w-16 rounded bg-gray-100" />
-                      <div className="mt-1 h-3.5 w-full rounded bg-gray-200" />
+                      <div className="h-4 w-full rounded bg-gray-200" />
+                      <div className="mt-1 h-3 w-24 rounded bg-gray-100" />
                     </li>
                   ))}
                 </ul>
               ) : items.length === 0 ? (
-                <p className="mt-3 text-xs text-gray-400">
+                <p className="mt-4 text-[13px] text-gray-400">
                   아직 뉴스가 없습니다.
                 </p>
               ) : (
-                <ol className="mt-4 space-y-3.5">
+                <ol className="mt-4 divide-y divide-gray-200">
                   {items.map((item) => (
                     <li key={item.link}>
                       <a
                         href={item.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group block"
+                        className="group block py-3 transition-colors hover:bg-gray-50/40"
                       >
-                        <div className="text-[12px] text-gray-500">
-                          {hostOf(item.originallink)} ·{" "}
-                          {formatRelative(item.pubDate)}
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-[15px] font-medium leading-snug text-gray-800 group-hover:text-gray-600">
+                        <p className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
                           {stripHtml(item.title)}
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          {hostOf(item.originallink)} —{" "}
+                          {formatRelative(item.pubDate)}
                         </p>
                       </a>
                     </li>
@@ -713,7 +683,7 @@ function FullFeed({
       ) : items.length === 0 ? (
         <EmptyState message="표시할 뉴스가 없습니다." />
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-gray-200">
           {items.map((item) => (
             <NewsCard key={item.link} item={item} />
           ))}
@@ -733,86 +703,21 @@ function SectionHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-        <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">{title}</h2>
-        {subtitle && (
-          <p className="text-[13px] text-gray-500 sm:text-sm">{subtitle}</p>
-        )}
-      </div>
-      {children && <div className="shrink-0">{children}</div>}
-    </div>
-  );
-}
-
-function ArrowButton({
-  onClick,
-  direction,
-}: {
-  onClick: () => void;
-  direction: "left" | "right";
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label={direction === "left" ? "이전" : "다음"}
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-gray-600 ring-1 ring-gray-200 transition-all hover:bg-gray-50 hover:text-gray-900 hover:ring-gray-300 active:scale-95"
-    >
-      <svg
-        className="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={2.2}
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d={
-            direction === "left"
-              ? "M15.75 19.5 8.25 12l7.5-7.5"
-              : "m8.25 4.5 7.5 7.5-7.5 7.5"
-          }
-        />
-      </svg>
-    </button>
-  );
-}
-
-function NewsCard({ item }: { item: AnyItem }) {
-  const categories = "categories" in item ? item.categories : [];
-  return (
-    <a
-      href={item.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-[#FFB81C]/60 hover:shadow-md"
-    >
-      <div className="flex items-center gap-2 text-[13px] text-gray-500">
-        <span className="font-medium text-gray-700">
-          {hostOf(item.originallink)}
-        </span>
-        <span>·</span>
-        <span>{formatRelative(item.pubDate)}</span>
-      </div>
-      <h3 className="mt-3 flex-1 text-[18px] font-semibold leading-snug text-gray-900 group-hover:text-gray-700">
-        {stripHtml(item.title)}
-      </h3>
-      {categories.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {categories.map((id) => (
-            <span
-              key={id}
-              className={`rounded-md px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${
-                CATEGORY_COLORS[id] ?? "bg-gray-100 text-gray-700"
-              }`}
-            >
-              {labelOf(id)}
-            </span>
-          ))}
+    <div className="mb-5 border-b-2 border-gray-900 pb-2 sm:mb-6 sm:pb-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+          <h2 className="text-[22px] font-extrabold tracking-tight text-gray-900 sm:text-[26px]">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-[12px] text-gray-500 sm:text-[13px]">
+              {subtitle}
+            </p>
+          )}
         </div>
-      )}
-    </a>
+        {children && <div className="shrink-0">{children}</div>}
+      </div>
+    </div>
   );
 }
 

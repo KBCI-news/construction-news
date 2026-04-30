@@ -29,9 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        <main className="min-h-screen bg-white">
           <Header />
-          <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-8 sm:py-10">
+          <div className="mx-auto max-w-[1280px] px-4 py-8 sm:px-8 sm:py-12">
             {children}
           </div>
         </main>
