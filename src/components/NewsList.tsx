@@ -66,7 +66,6 @@ export default function NewsList() {
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
   const [featuredRange, setFeaturedRange] = useState<TimeRange>("daily");
-  const [activeTab, setActiveTab] = useState<string>(ALL_TAB);
   const fullFeedRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -149,18 +148,14 @@ export default function NewsList() {
     return c;
   }, [allItems]);
 
-  const tabFiltered = useMemo(() => {
-    const base =
-      activeTab === ALL_TAB
-        ? allItems
-        : allItems.filter((it) => it.categories.includes(activeTab));
-    return base.slice().sort((a, b) => {
+  const sortedItems = useMemo(() => {
+    return allItems.slice().sort((a, b) => {
       const sa = relevanceScore(a);
       const sb = relevanceScore(b);
       if (sb !== sa) return sb - sa;
       return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
     });
-  }, [allItems, activeTab]);
+  }, [allItems]);
 
   const onSubmitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,20 +169,8 @@ export default function NewsList() {
     setSearchQuery(null);
   };
 
-  const jumpToCategory = (catId: string) => {
-    setActiveTab(catId);
-    requestAnimationFrame(() => {
-      fullFeedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  };
-
   return (
-    <>
-      <CategoryNav
-        activeTab={activeTab}
-        onTabChange={jumpToCategory}
-      />
-      <div className="space-y-8 sm:space-y-12">
+    <div className="space-y-8 sm:space-y-12">
       <SearchBar
         value={searchInput}
         onChange={setSearchInput}
@@ -243,57 +226,17 @@ export default function NewsList() {
           <CategoryHighlights
             tops={categoryTops}
             counts={counts}
-            onCategoryClick={jumpToCategory}
             loading={loading}
           />
 
           <FullFeed
             sectionRef={fullFeedRef}
-            activeTab={activeTab}
-            items={tabFiltered}
+            items={sortedItems}
             loading={loading}
           />
         </>
       )}
-      </div>
-    </>
-  );
-}
-
-function CategoryNav({
-  activeTab,
-  onTabChange,
-}: {
-  activeTab: string;
-  onTabChange: (id: string) => void;
-}) {
-  const items = [{ id: ALL_TAB, label: "전체" }, ...CATEGORIES];
-  return (
-    <nav className="sticky top-[68px] z-20 -mx-4 mb-6 border-b border-gray-200 bg-white/95 backdrop-blur-md sm:top-[72px] sm:-mx-8 sm:mb-8">
-      <div className="px-4 sm:px-8">
-        <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
-          {items.map((item) => {
-            const active = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className={`relative shrink-0 px-3 py-3.5 text-[15px] font-medium transition-colors sm:px-4 ${
-                  active
-                    ? "text-gray-900"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {item.label}
-                {active && (
-                  <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-t bg-[#FFB81C] sm:inset-x-4" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </nav>
+    </div>
   );
 }
 
@@ -431,12 +374,10 @@ function FeaturedSection({
 function CategoryHighlights({
   tops,
   counts,
-  onCategoryClick,
   loading,
 }: {
   tops: Record<string, EnrichedNewsItem[]>;
   counts: Record<string, number>;
-  onCategoryClick: (catId: string) => void;
   loading: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -469,8 +410,8 @@ function CategoryHighlights({
               key={cat.id}
               className="flex w-[85%] shrink-0 snap-start flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:border-[#FFB81C]/60 hover:shadow-md md:w-[calc((100%-1.5rem)/3)]"
             >
-              <button
-                onClick={() => onCategoryClick(cat.id)}
+              <Link
+                href={`/category/${cat.id}`}
                 className="flex w-full items-center justify-between gap-2 text-left"
                 title="전체보기"
               >
@@ -485,7 +426,7 @@ function CategoryHighlights({
                 <span className="shrink-0 whitespace-nowrap text-[12px] text-gray-400">
                   {counts[cat.id] ?? 0}건 →
                 </span>
-              </button>
+              </Link>
               {loading ? (
                 <ul className="mt-3 space-y-2.5">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -531,23 +472,17 @@ function CategoryHighlights({
 
 function FullFeed({
   sectionRef,
-  activeTab,
   items,
   loading,
 }: {
   sectionRef: React.RefObject<HTMLElement>;
-  activeTab: string;
   items: AnyItem[];
   loading: boolean;
 }) {
-  const activeLabel =
-    activeTab === ALL_TAB
-      ? "전체"
-      : CATEGORIES.find((c) => c.id === activeTab)?.label ?? "전체";
   return (
     <section ref={sectionRef} className="scroll-mt-32">
       <SectionHeader
-        title={`${activeLabel} 뉴스`}
+        title="최신 뉴스"
         subtitle={`관련도 높은 순 · 총 ${items.length}건`}
       />
 
