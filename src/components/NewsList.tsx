@@ -124,7 +124,7 @@ export default function NewsList() {
   }, [data]);
 
   const featured = useMemo(
-    () => filterFeatured(allItems, featuredRange, 12),
+    () => filterFeatured(allItems, featuredRange, 10),
     [allItems, featuredRange],
   );
 
@@ -216,7 +216,7 @@ export default function NewsList() {
         </section>
       ) : (
         <>
-          <FeaturedSection
+          <HeroSection
             items={featured}
             range={featuredRange}
             onRangeChange={setFeaturedRange}
@@ -281,7 +281,7 @@ function SearchBar({
   );
 }
 
-function FeaturedSection({
+function HeroSection({
   items,
   range,
   onRangeChange,
@@ -292,14 +292,10 @@ function FeaturedSection({
   onRangeChange: (r: TimeRange) => void;
   loading: boolean;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollByCard = (dir: 1 | -1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const firstCard = el.children[0] as HTMLElement | undefined;
-    const cardWidth = firstCard?.offsetWidth ?? el.clientWidth * 0.85;
-    el.scrollBy({ left: dir * (cardWidth + 12), behavior: "smooth" });
-  };
+  const main = items[0];
+  const subStories = items.slice(1, 5);
+  const sideStories = items.slice(5, 10);
+
   return (
     <section>
       <SectionHeader
@@ -311,10 +307,6 @@ function FeaturedSection({
         }
       >
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="hidden items-center gap-1 md:flex">
-            <ArrowButton onClick={() => scrollByCard(-1)} direction="left" />
-            <ArrowButton onClick={() => scrollByCard(1)} direction="right" />
-          </div>
           <div className="inline-flex rounded-lg bg-gray-100 p-1">
             <button
               onClick={() => onRangeChange("daily")}
@@ -347,27 +339,134 @@ function FeaturedSection({
       </SectionHeader>
 
       {loading ? (
-        <SkeletonGrid />
+        <HeroSkeleton />
       ) : items.length === 0 ? (
         <EmptyState
           message={`${range === "daily" ? "오늘" : "이번 주"} 표시할 주요 뉴스가 없습니다.`}
         />
       ) : (
-        <div
-          ref={scrollRef}
-          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0"
-        >
-          {items.map((item) => (
-            <div
-              key={item.link}
-              className="w-[85%] shrink-0 snap-start md:w-[calc((100%-1.5rem)/3)] lg:w-[calc((100%-2.25rem)/4)]"
+        <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
+          <div className="space-y-3 lg:col-span-2">
+            <a
+              href={main.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group block rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-[#FFB81C]/60 hover:shadow-md sm:p-8"
             >
-              <NewsCard item={item} />
+              <div className="text-[13px] text-gray-500">
+                <span className="font-medium text-gray-700">
+                  {hostOf(main.originallink)}
+                </span>
+                <span className="mx-2">·</span>
+                <span>{formatRelative(main.pubDate)}</span>
+              </div>
+              <h3 className="mt-3 text-[22px] font-bold leading-snug text-gray-900 group-hover:text-gray-700 sm:text-[26px]">
+                {stripHtml(main.title)}
+              </h3>
+            </a>
+
+            {subStories.length > 0 && (
+              <ul className="divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                {subStories.map((item) => (
+                  <li key={item.link}>
+                    <a
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block px-5 py-4 transition-colors hover:bg-gray-50"
+                    >
+                      <p className="text-[16px] font-semibold leading-snug text-gray-900 group-hover:text-gray-700">
+                        {stripHtml(item.title)}
+                      </p>
+                      <p className="mt-1.5 text-[12px] text-gray-500">
+                        <span className="font-medium text-gray-700">
+                          {hostOf(item.originallink)}
+                        </span>
+                        <span className="mx-1.5">·</span>
+                        {formatRelative(item.pubDate)}
+                      </p>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <aside>
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="text-sm font-bold text-gray-900">핫뉴스</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                관련도 높은 순 TOP 5
+              </p>
+              {sideStories.length === 0 ? (
+                <p className="mt-4 text-sm text-gray-400">
+                  표시할 뉴스가 없습니다.
+                </p>
+              ) : (
+                <ol className="mt-4 space-y-4">
+                  {sideStories.map((item, idx) => (
+                    <li key={item.link}>
+                      <a
+                        href={item.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex gap-3"
+                      >
+                        <span className="shrink-0 text-base font-extrabold text-[#FFB81C]">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-[14px] font-medium leading-snug text-gray-800 group-hover:text-gray-600">
+                            {stripHtml(item.title)}
+                          </p>
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            {hostOf(item.originallink)} ·{" "}
+                            {formatRelative(item.pubDate)}
+                          </p>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
-          ))}
+          </aside>
         </div>
       )}
     </section>
+  );
+}
+
+function HeroSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
+      <div className="space-y-3 lg:col-span-2">
+        <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
+          <div className="h-3 w-32 rounded bg-gray-200" />
+          <div className="mt-4 h-6 w-3/4 rounded bg-gray-200" />
+          <div className="mt-2 h-6 w-1/2 rounded bg-gray-200" />
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="animate-pulse border-b border-gray-200 px-5 py-4 last:border-b-0">
+              <div className="h-4 w-3/4 rounded bg-gray-200" />
+              <div className="mt-2 h-3 w-32 rounded bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="h-4 w-20 rounded bg-gray-200" />
+        <div className="mt-4 space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i}>
+              <div className="h-4 w-full rounded bg-gray-200" />
+              <div className="mt-1 h-3 w-24 rounded bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -591,24 +690,6 @@ function NewsCard({ item }: { item: AnyItem }) {
         </div>
       )}
     </a>
-  );
-}
-
-function SkeletonGrid() {
-  return (
-    <div className="flex flex-col gap-3 md:flex-row">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5 md:flex-1"
-        >
-          <div className="h-3 w-32 rounded bg-gray-200" />
-          <div className="mt-3 h-5 w-3/4 rounded bg-gray-200" />
-          <div className="mt-2 h-4 w-full rounded bg-gray-100" />
-          <div className="mt-1.5 h-4 w-2/3 rounded bg-gray-100" />
-        </div>
-      ))}
-    </div>
   );
 }
 
