@@ -48,7 +48,7 @@ export default function FeaturedListClient() {
         ← 메인으로
       </Link>
 
-      <div className="border-b-2 border-gray-900 pb-3">
+      <div className="border-b border-gray-200 pb-3">
         <p className="text-[11px] font-bold tracking-widest text-[#FFB81C]">
           KBCI NEWS · FEATURED
         </p>

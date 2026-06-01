@@ -164,7 +164,7 @@ export default function NewsList() {
   };
 
   return (
-    <div className="space-y-10 sm:space-y-14">
+    <div className="space-y-6">
       <SearchPanel
         value={searchInput}
         onChange={setSearchInput}
@@ -174,6 +174,8 @@ export default function NewsList() {
         hotKeywords={hotKeywords}
       />
 
+      {!searchQuery && <StatRow counts={counts} loading={loading} />}
+
       {error && (
         <div className="border-l-4 border-rose-500 bg-rose-50 p-4 text-sm text-rose-700">
           {error}
@@ -181,7 +183,7 @@ export default function NewsList() {
       )}
 
       {searchQuery ? (
-        <section className="space-y-5">
+        <section className="card space-y-5 p-5 sm:p-7">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">
               <span className="text-[#9A7A12]">&quot;{searchQuery}&quot;</span>{" "}
@@ -259,7 +261,7 @@ function SearchPanel({
 
   return (
     <div
-      className="relative"
+      className="card relative px-4 py-1"
       // 드롭다운 내부 버튼으로 포커스가 이동할 땐 닫지 않는다.
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
@@ -293,18 +295,18 @@ function SearchPanel({
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           placeholder="키워드를 입력해 검색하세요"
-          className="w-full border-b-2 border-gray-300 bg-white py-3.5 pl-9 pr-20 text-[17px] font-semibold text-gray-900 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] sm:text-[19px]"
+          className="w-full bg-transparent py-3 pl-9 pr-16 text-[16px] font-semibold text-gray-900 outline-none placeholder:font-normal placeholder:text-gray-400 sm:text-[17px]"
         />
         <button
           type="submit"
-          className="absolute right-0 top-1/2 -translate-y-1/2 px-3 py-2 text-[14px] font-bold tracking-wider text-gray-900 hover:text-[#9A7A12]"
+          className="absolute right-0 top-1/2 -translate-y-1/2 px-2 py-2 text-[14px] font-bold tracking-wider text-gray-500 hover:text-[#9A7A12]"
         >
           검색
         </button>
       </form>
 
       {focused && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-2 border border-gray-200 bg-white p-5 shadow-xl sm:p-6">
+        <div className="card absolute left-0 right-0 top-full z-30 mt-2 p-5 shadow-xl sm:p-6">
           <div className="grid gap-x-10 gap-y-7 sm:grid-cols-2">
             <RankBoard
               title="인기 검색어"
@@ -338,7 +340,7 @@ function RankBoard({
 }) {
   return (
     <div>
-      <div className="mb-3 flex items-baseline justify-between border-b-2 border-gray-900 pb-2">
+      <div className="mb-3 flex items-baseline justify-between border-b border-gray-200 pb-2">
         <h3 className="text-[13px] font-bold tracking-widest text-gray-900">
           {title}
         </h3>
@@ -393,7 +395,7 @@ function HeroSection({
   const allLinks = items.map((it) => it.link);
 
   return (
-    <section>
+    <section className="card p-5 sm:p-7">
       <SectionHeader
         title="주요 뉴스"
         subtitle={
@@ -518,7 +520,7 @@ function HeroSection({
           </div>
 
           <aside>
-            <div className="border-b-2 border-gray-900 pb-2">
+            <div className="border-b border-gray-200 pb-2">
               <h3 className="text-[13px] font-bold tracking-widest text-gray-900">
                 핫뉴스 TOP 5
               </h3>
@@ -568,7 +570,7 @@ function LegalSection({
 }) {
   if (!loading && items.length === 0) return null;
   return (
-    <section>
+    <section className="card p-5 sm:p-7">
       <SectionHeader
         title="법·제도 동향"
         subtitle="관련 법령 개정·제재·위반 사례"
@@ -643,7 +645,7 @@ function CategoryHighlights({
   loading: boolean;
 }) {
   return (
-    <section>
+    <section className="card p-5 sm:p-7">
       <SectionHeader title="카테고리별 인사이트" subtitle="주제별 최신 뉴스" />
       <div className="grid gap-8 md:grid-cols-2 md:gap-10 lg:grid-cols-3">
         {CATEGORIES.map((cat) => {
@@ -718,7 +720,7 @@ function FullFeed({
   loading: boolean;
 }) {
   return (
-    <section className="scroll-mt-32">
+    <section className="card scroll-mt-32 p-5 sm:p-7">
       <SectionHeader
         title="최신 뉴스"
         subtitle={`관련도 높은 순 · 총 ${items.length}건`}
@@ -749,20 +751,53 @@ function SectionHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-5 border-b-2 border-gray-900 pb-2 sm:mb-6 sm:pb-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h2 className="text-[22px] font-extrabold tracking-tight text-gray-900 sm:text-[27px]">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-[13px] text-gray-500 sm:text-[14px]">
-              {subtitle}
-            </p>
-          )}
-        </div>
-        {children && <div className="shrink-0">{children}</div>}
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="min-w-0">
+        <h2 className="accent-bar flex items-center text-[18px] font-extrabold tracking-tight text-gray-900 sm:text-[20px]">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="mt-1 pl-[14px] text-[12.5px] text-gray-400">
+            {subtitle}
+          </p>
+        )}
       </div>
+      {children && <div className="shrink-0">{children}</div>}
+    </div>
+  );
+}
+
+function StatRow({
+  counts,
+  loading,
+}: {
+  counts: Record<string, number>;
+  loading: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3">
+      {CATEGORIES.map((cat) => (
+        <Link
+          key={cat.id}
+          href={`/category/${cat.id}`}
+          className="card group px-3.5 py-3 transition-shadow hover:shadow-md"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-bold tracking-wide text-gray-500 group-hover:text-gray-900">
+              {cat.label}
+            </span>
+            <span className="text-gray-300 transition-colors group-hover:text-[#9A7A12]">
+              →
+            </span>
+          </div>
+          <div className="mt-1.5 flex items-baseline gap-1">
+            <span className="text-[22px] font-extrabold tabular-nums tracking-tight text-gray-900">
+              {loading ? "–" : (counts[cat.id] ?? 0).toLocaleString()}
+            </span>
+            <span className="text-[11px] font-medium text-gray-400">건</span>
+          </div>
+        </Link>
+      ))}
     </div>
   );
 }

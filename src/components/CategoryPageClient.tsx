@@ -69,7 +69,7 @@ export default function CategoryPageClient({
 
   return (
     <div className="space-y-8">
-      <div className="border-b-2 border-gray-900 pb-3">
+      <div className="border-b border-gray-200 pb-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[12px] font-bold tracking-widest text-[#9A7A12]">
@@ -122,7 +122,7 @@ export default function CategoryPageClient({
 
         <aside>
           <div className="lg:sticky lg:top-[140px]">
-            <div className="border-b-2 border-gray-900 pb-2">
+            <div className="border-b border-gray-200 pb-2">
               <h2 className="text-[13px] font-bold tracking-widest text-gray-900">
                 주요 뉴스 TOP 5
               </h2>
