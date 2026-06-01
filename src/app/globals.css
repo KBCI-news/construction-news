@@ -3,25 +3,123 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f5f7;
+  --foreground: #18181b;
+  --surface: #ffffff;
+  --line: #e6e7ea;
+  --kb: #ffb81c;
+  --kb-ink: #8a6d10;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* 고령 사용자 가독성을 위해 기본 폰트 크기를 키운다 */
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
+  line-height: 1.6;
+  word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
+}
+
+@layer components {
+  /* 대시보드 패널 표면 */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  }
+  /* 섹션 제목 앞 KB 옐로우 액센트 바 */
+  .accent-bar::before {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 0.95em;
+    margin-right: 0.55rem;
+    border-radius: 2px;
+    background: var(--kb);
+    transform: translateY(1px);
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+/* 리더 뷰 본문 타이포그래피 (가독성 우선) */
+.article-body {
+  font-size: 17px;
+  line-height: 1.9;
+  color: #2a2a2a;
+}
+.article-body p {
+  margin: 0 0 1.15em;
+}
+.article-body h1,
+.article-body h2,
+.article-body h3,
+.article-body h4 {
+  margin: 1.6em 0 0.6em;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #111;
+}
+.article-body img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.4em auto;
+  border-radius: 10px;
+}
+.article-body figure {
+  margin: 1.4em 0;
+}
+.article-body figcaption {
+  margin-top: 0.5em;
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+}
+.article-body blockquote {
+  margin: 1.4em 0;
+  padding: 0.2em 0 0.2em 1em;
+  border-left: 3px solid #ffb81c;
+  color: #555;
+}
+.article-body a {
+  color: #9a7a12;
+  text-decoration: underline;
+}
+.article-body ul,
+.article-body ol {
+  margin: 0 0 1.15em;
+  padding-left: 1.4em;
+}
+.article-body li {
+  margin: 0.3em 0;
+}
+
+/* 인쇄 / PDF 저장 시 화면 전용 요소 숨김 */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  html {
+    font-size: 14px;
+  }
+  body {
+    background: #ffffff;
+  }
+  .print-article {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

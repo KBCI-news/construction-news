@@ -1,8 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
+
+// public/kb-logo.png(또는 .svg)가 있으면 그 로고를, 없으면 KB 옐로우 타일로 폴백
+function BrandLogo() {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFB81C] text-[15px] font-extrabold tracking-tight text-gray-900">
+        KB
+      </div>
+    );
+  }
+  return (
+    // 회사 로고 이미지(임의 자산)라 next/image 대신 일반 img 사용
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/kb-logo.png"
+      alt="KB"
+      className="h-9 w-auto"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -15,48 +38,50 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-30 bg-gray-900">
-      <div className="h-1 w-full bg-[#FFB81C]" />
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-3.5 sm:px-8 sm:py-4">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#FFB81C] text-base font-extrabold tracking-tight text-gray-900">
-            KB
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white sm:text-xl">
-              KBCI 뉴스
-            </h1>
-            <p className="text-[12px] text-gray-400 sm:text-[13px]">
-              KB신용정보 사내 뉴스 모니터링
-            </p>
-          </div>
-        </Link>
-      </div>
-      <div className="border-t border-gray-800">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-8">
-          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
-            {navItems.map((item) => {
-              const active =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname?.startsWith(item.href) ?? false;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`relative shrink-0 px-3 py-3 text-[15px] font-bold transition-colors sm:px-4 ${
-                    active ? "text-white" : "text-gray-300 hover:text-white"
-                  }`}
-                >
-                  {item.label}
-                  {active && (
-                    <span className="absolute inset-x-3 -bottom-px h-0.5 bg-[#FFB81C] sm:inset-x-4" />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/90 backdrop-blur">
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
+        <div className="flex items-center justify-between py-3">
+          <Link href="/" className="flex items-center gap-2.5">
+            <BrandLogo />
+            <div className="leading-tight">
+              <h1 className="text-[17px] font-extrabold tracking-tight text-gray-900">
+                KBCI 뉴스
+              </h1>
+              <p className="text-[11px] text-gray-400">
+                KB신용정보 뉴스 모니터링
+              </p>
+            </div>
+          </Link>
+          <span className="hidden items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1 text-[11px] font-bold tracking-wider text-gray-500 sm:inline-flex">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            실시간 수집
+          </span>
         </div>
+
+        <nav className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {navItems.map((item) => {
+            const active =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname?.startsWith(item.href) ?? false;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
+                  active
+                    ? "text-gray-900"
+                    : "text-gray-400 hover:text-gray-700"
+                }`}
+              >
+                {item.label}
+                {active && (
+                  <span className="absolute inset-x-2.5 -bottom-px h-[3px] rounded-full bg-[#FFB81C]" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </header>
   );

@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import { filterFeatured, type TimeRange } from "@/lib/featured";
+import { dedupeArticles, type Article } from "@/lib/news";
 import { NewsCard } from "@/components/NewsCard";
+import { PrintLink } from "@/components/PrintLink";
 
 export default function FeaturedListClient() {
   const [items, setItems] = useState<NewsResponseItem[]>([]);
@@ -33,9 +35,9 @@ export default function FeaturedListClient() {
   }, []);
 
   const featured = useMemo(
-    () => filterFeatured(items, range, 50),
+    () => filterFeatured(dedupeArticles(items as Article[]), range, 50),
     [items, range],
-  );
+  ) as NewsResponseItem[];
 
   return (
     <div className="space-y-8">
@@ -46,7 +48,7 @@ export default function FeaturedListClient() {
         ← 메인으로
       </Link>
 
-      <div className="border-b-2 border-gray-900 pb-3">
+      <div className="border-b border-gray-200 pb-3">
         <p className="text-[11px] font-bold tracking-widest text-[#FFB81C]">
           KBCI NEWS · FEATURED
         </p>
@@ -60,6 +62,14 @@ export default function FeaturedListClient() {
               이슈 (최대 50건)
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          {featured.length > 0 && (
+            <PrintLink
+              links={featured.map((it) => it.link)}
+              label="전체 출력"
+              className="no-print inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            />
+          )}
           <div className="inline-flex border border-gray-300 text-[13px]">
             <button
               onClick={() => setRange("daily")}
@@ -81,6 +91,7 @@ export default function FeaturedListClient() {
             >
               주간
             </button>
+          </div>
           </div>
         </div>
       </div>

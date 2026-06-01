@@ -10,6 +10,7 @@ export type NewsResponseItem = {
   description: string;
   pubDate: string;
   categories: string[];
+  imageUrl: string | null;
 };
 
 const MAX_ITEMS = 1000;
@@ -27,7 +28,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("articles")
-    .select("link,original_link,title,description,pub_date,categories")
+    .select(
+      "link,original_link,title,description,pub_date,categories,image_url",
+    )
     .order("pub_date", { ascending: false })
     .range(0, MAX_ITEMS - 1);
 
@@ -40,7 +43,13 @@ export async function GET() {
 
   const rows = (data ?? []) as Pick<
     ArticleRow,
-    "link" | "original_link" | "title" | "description" | "pub_date" | "categories"
+    | "link"
+    | "original_link"
+    | "title"
+    | "description"
+    | "pub_date"
+    | "categories"
+    | "image_url"
   >[];
 
   const items: NewsResponseItem[] = rows.map((r) => ({
@@ -50,6 +59,7 @@ export async function GET() {
     description: r.description ?? "",
     pubDate: r.pub_date,
     categories: r.categories ?? [],
+    imageUrl: r.image_url ?? null,
   }));
 
   return NextResponse.json({ total: items.length, items });
