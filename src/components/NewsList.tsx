@@ -791,7 +791,7 @@ function StatRow({
         <Link
           key={cat.id}
           href={`/category/${cat.id}`}
-          className="card group px-3.5 py-3 transition-shadow hover:shadow-md"
+          className="card group px-3.5 py-3 transition-all hover:-translate-y-0.5 hover:border-[#FFE2A3] hover:shadow-md"
         >
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-bold tracking-wide text-gray-500 group-hover:text-gray-900">
