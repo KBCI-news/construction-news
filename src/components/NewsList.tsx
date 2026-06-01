@@ -164,20 +164,14 @@ export default function NewsList() {
 
   return (
     <div className="space-y-10 sm:space-y-14">
-      <div className="space-y-4">
-        <SearchBar
-          value={searchInput}
-          onChange={setSearchInput}
-          onSubmit={onSubmitSearch}
-        />
-        {!searchQuery && (
-          <TrendingBar
-            searches={trending}
-            hotKeywords={hotKeywords}
-            onPick={runSearch}
-          />
-        )}
-      </div>
+      <SearchPanel
+        value={searchInput}
+        onChange={setSearchInput}
+        onSubmit={onSubmitSearch}
+        onPick={runSearch}
+        searches={trending}
+        hotKeywords={hotKeywords}
+      />
 
       {error && (
         <div className="border-l-4 border-rose-500 bg-rose-50 p-4 text-sm text-rose-700">
@@ -240,120 +234,142 @@ export default function NewsList() {
   );
 }
 
-function SearchBar({
+function SearchPanel({
   value,
   onChange,
   onSubmit,
+  onPick,
+  searches,
+  hotKeywords,
 }: {
   value: string;
   onChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-}) {
-  return (
-    <form onSubmit={onSubmit} className="relative">
-      <svg
-        className="pointer-events-none absolute left-1 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={2}
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-        />
-      </svg>
-      <input
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="키워드를 입력해 검색하세요"
-        className="w-full border-b-2 border-gray-300 bg-white py-3.5 pl-9 pr-20 text-[17px] font-semibold text-gray-900 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] sm:text-[19px]"
-      />
-      <button
-        type="submit"
-        className="absolute right-0 top-1/2 -translate-y-1/2 px-3 py-2 text-[14px] font-bold tracking-wider text-gray-900 hover:text-[#9A7A12]"
-      >
-        검색
-      </button>
-    </form>
-  );
-}
-
-function TrendingBar({
-  searches,
-  hotKeywords,
-  onPick,
-}: {
+  onPick: (q: string) => void;
   searches: { query: string; count: number }[];
   hotKeywords: { keyword: string; count: number }[];
-  onPick: (q: string) => void;
 }) {
-  const hasSearches = searches.length > 0;
+  const [focused, setFocused] = useState(false);
+
+  const handlePick = (q: string) => {
+    onPick(q);
+    setFocused(false);
+  };
+
   return (
-    <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
-      <KeywordRow
-        title="인기 검색어"
-        empty="아직 검색 데이터가 없습니다"
-        chips={searches.map((s) => s.query)}
-        ranked
-        onPick={onPick}
-        show={hasSearches}
-      />
-      <KeywordRow
-        title="핫 키워드"
-        empty="집계 중입니다"
-        chips={hotKeywords.map((k) => k.keyword)}
-        ranked={false}
-        onPick={onPick}
-        show
-      />
+    <div
+      className="relative"
+      // 드롭다운 내부 버튼으로 포커스가 이동할 땐 닫지 않는다.
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setFocused(false);
+        }
+      }}
+    >
+      <form
+        onSubmit={(e) => {
+          onSubmit(e);
+          setFocused(false);
+        }}
+        className="relative"
+      >
+        <svg
+          className="pointer-events-none absolute left-1 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+          />
+        </svg>
+        <input
+          type="search"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          placeholder="키워드를 입력해 검색하세요"
+          className="w-full border-b-2 border-gray-300 bg-white py-3.5 pl-9 pr-20 text-[17px] font-semibold text-gray-900 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] sm:text-[19px]"
+        />
+        <button
+          type="submit"
+          className="absolute right-0 top-1/2 -translate-y-1/2 px-3 py-2 text-[14px] font-bold tracking-wider text-gray-900 hover:text-[#9A7A12]"
+        >
+          검색
+        </button>
+      </form>
+
+      {focused && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-2 border border-gray-200 bg-white p-5 shadow-xl sm:p-6">
+          <div className="grid gap-x-10 gap-y-7 sm:grid-cols-2">
+            <RankBoard
+              title="인기 검색어"
+              empty="아직 검색 데이터가 없습니다"
+              items={searches.map((s) => s.query)}
+              onPick={handlePick}
+            />
+            <RankBoard
+              title="핫 키워드"
+              empty="집계 중입니다"
+              items={hotKeywords.map((k) => k.keyword)}
+              onPick={handlePick}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function KeywordRow({
+function RankBoard({
   title,
   empty,
-  chips,
-  ranked,
+  items,
   onPick,
-  show,
 }: {
   title: string;
   empty: string;
-  chips: string[];
-  ranked: boolean;
+  items: string[];
   onPick: (q: string) => void;
-  show: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 shrink-0 text-[12px] font-bold tracking-widest text-gray-900">
-        {title}
-      </span>
-      {show && chips.length > 0 ? (
-        <div className="flex flex-wrap gap-x-2 gap-y-1.5">
-          {chips.map((chip, i) => (
-            <button
-              key={chip}
-              onClick={() => onPick(chip)}
-              className="group inline-flex items-center gap-1 text-[13.5px] text-gray-600 transition-colors hover:text-[#9A7A12]"
-            >
-              {ranked && (
-                <span className="font-extrabold tabular-nums text-[#FFB81C]">
+    <div>
+      <div className="mb-3 flex items-baseline justify-between border-b-2 border-gray-900 pb-2">
+        <h3 className="text-[13px] font-bold tracking-widest text-gray-900">
+          {title}
+        </h3>
+        <span className="text-[11px] font-bold tracking-wider text-gray-400">
+          TOP 10
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <p className="py-3 text-[13px] text-gray-400">{empty}</p>
+      ) : (
+        <ol className="space-y-2.5">
+          {items.slice(0, 10).map((item, i) => (
+            <li key={item}>
+              <button
+                type="button"
+                onClick={() => onPick(item)}
+                className="group flex w-full items-center gap-3 text-left"
+              >
+                <span
+                  className={`w-5 shrink-0 text-[15px] font-extrabold tabular-nums ${
+                    i < 3 ? "text-[#FFB81C]" : "text-gray-300"
+                  }`}
+                >
                   {i + 1}
                 </span>
-              )}
-              <span className="font-semibold group-hover:underline">
-                {chip}
-              </span>
-            </button>
+                <span className="truncate text-[14px] font-semibold text-gray-700 group-hover:text-[#9A7A12] group-hover:underline">
+                  {item}
+                </span>
+              </button>
+            </li>
           ))}
-        </div>
-      ) : (
-        <span className="text-[13px] text-gray-400">{empty}</span>
+        </ol>
       )}
     </div>
   );

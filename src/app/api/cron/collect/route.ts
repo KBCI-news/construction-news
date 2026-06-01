@@ -14,8 +14,8 @@ const PER_KEYWORD = 100;
 // 이미지 크롤링은 비용이 크므로 한 번의 실행에서 이미지가 없는 기사만,
 // 최대 MAX_IMAGE_CRAWL개까지 동시 IMAGE_CONCURRENCY개씩 처리한다.
 // (30분마다 실행되며 여러 회차에 걸쳐 점진적으로 채워진다)
-const MAX_IMAGE_CRAWL = 40;
-const IMAGE_CONCURRENCY = 8;
+const MAX_IMAGE_CRAWL = 80;
+const IMAGE_CONCURRENCY = 10;
 
 type ArticleUpsert = {
   link: string;
