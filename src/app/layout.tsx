@@ -37,7 +37,7 @@ export default function RootLayout({
       >
         <main className="min-h-screen">
           <Header />
-          <div className="mx-auto max-w-[1280px] px-4 py-7 sm:px-8 sm:py-10">
+          <div className="mx-auto max-w-[1280px] overflow-x-hidden px-4 py-7 sm:px-8 sm:py-10">
             {children}
           </div>
         </main>
