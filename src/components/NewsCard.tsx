@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { CATEGORIES } from "@/lib/categories";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
+import { readerHref } from "@/lib/links";
 import { Thumbnail } from "@/components/Thumbnail";
 import { PrintLink } from "@/components/PrintLink";
 
@@ -36,12 +38,7 @@ export function NewsCard({ item }: { item: NewsCardItem }) {
             ))}
           </div>
         )}
-        <a
-          href={item.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block"
-        >
+        <Link href={readerHref(item.link)} className="block">
           <h3 className="text-[19px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[21px]">
             {stripHtml(item.title)}
           </h3>
@@ -50,7 +47,7 @@ export function NewsCard({ item }: { item: NewsCardItem }) {
               {summary}
             </p>
           )}
-        </a>
+        </Link>
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-gray-500">
           <span>
             <span className="font-medium text-gray-700">
@@ -63,10 +60,8 @@ export function NewsCard({ item }: { item: NewsCardItem }) {
         </div>
       </div>
 
-      <a
-        href={item.link}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        href={readerHref(item.link)}
         className="block shrink-0"
         tabIndex={-1}
         aria-hidden
@@ -76,7 +71,7 @@ export function NewsCard({ item }: { item: NewsCardItem }) {
           label={placeholderLabel}
           className="h-[72px] w-[104px] rounded-lg sm:h-[108px] sm:w-[168px]"
         />
-      </a>
+      </Link>
     </article>
   );
 }

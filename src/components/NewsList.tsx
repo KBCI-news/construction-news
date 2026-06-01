@@ -8,6 +8,7 @@ import type { TrendingResponse } from "@/app/api/trending/route";
 import { CATEGORIES, HOT_KEYWORDS } from "@/lib/categories";
 import { filterFeatured, type TimeRange } from "@/lib/featured";
 import { formatRelative } from "@/lib/format";
+import { readerHref } from "@/lib/links";
 import {
   byDate,
   byRelevance,
@@ -449,12 +450,7 @@ function HeroSection({
       ) : (
         <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
           <div className="lg:col-span-2">
-            <a
-              href={main.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group block"
-            >
+            <a href={readerHref(main.link)} className="group block">
               <Thumbnail
                 src={main.imageUrl}
                 label={main.categories[0] ? labelOf(main.categories[0]) : "KBCI"}
@@ -489,9 +485,7 @@ function HeroSection({
                   {subStories.map((item) => (
                     <li key={item.link}>
                       <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={readerHref(item.link)}
                         className="group flex items-start gap-4 py-4 transition-colors hover:bg-gray-50/40"
                       >
                         <div className="min-w-0 flex-1">
@@ -538,9 +532,7 @@ function HeroSection({
                 {sideStories.map((item, idx) => (
                   <li key={item.link}>
                     <a
-                      href={item.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={readerHref(item.link)}
                       className="group flex gap-3"
                     >
                       <span className="shrink-0 text-[18px] font-extrabold tabular-nums text-[#FFB81C]">
@@ -595,9 +587,7 @@ function LegalSection({
           {items.map((item) => (
             <a
               key={item.link}
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={readerHref(item.link)}
               className="group flex gap-3 border-l-2 border-[#FFB81C] pl-3"
             >
               <div className="min-w-0">
@@ -690,9 +680,7 @@ function CategoryHighlights({
                   {items.map((item) => (
                     <li key={item.link}>
                       <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={readerHref(item.link)}
                         className="group flex items-start gap-3 py-3 transition-colors hover:bg-gray-50/40"
                       >
                         <div className="min-w-0 flex-1">

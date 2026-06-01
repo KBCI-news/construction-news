@@ -29,6 +29,59 @@ body {
   }
 }
 
+/* 리더 뷰 본문 타이포그래피 (가독성 우선) */
+.article-body {
+  font-size: 17px;
+  line-height: 1.9;
+  color: #2a2a2a;
+}
+.article-body p {
+  margin: 0 0 1.15em;
+}
+.article-body h1,
+.article-body h2,
+.article-body h3,
+.article-body h4 {
+  margin: 1.6em 0 0.6em;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #111;
+}
+.article-body img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.4em auto;
+  border-radius: 10px;
+}
+.article-body figure {
+  margin: 1.4em 0;
+}
+.article-body figcaption {
+  margin-top: 0.5em;
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+}
+.article-body blockquote {
+  margin: 1.4em 0;
+  padding: 0.2em 0 0.2em 1em;
+  border-left: 3px solid #ffb81c;
+  color: #555;
+}
+.article-body a {
+  color: #9a7a12;
+  text-decoration: underline;
+}
+.article-body ul,
+.article-body ol {
+  margin: 0 0 1.15em;
+  padding-left: 1.4em;
+}
+.article-body li {
+  margin: 0.3em 0;
+}
+
 /* 인쇄 / PDF 저장 시 화면 전용 요소 숨김 */
 @media print {
   .no-print {

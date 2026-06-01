@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import { CATEGORIES } from "@/lib/categories";
 import { formatRelative } from "@/lib/format";
+import { readerHref } from "@/lib/links";
 import {
   byRelevance,
   dedupeArticles,
@@ -140,9 +141,7 @@ export default function CategoryPageClient({
                 {topRanked.map((item, idx) => (
                   <li key={item.link}>
                     <a
-                      href={item.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={readerHref(item.link)}
                       className="group flex gap-3"
                     >
                       <span className="shrink-0 text-[16px] font-extrabold tabular-nums text-[#FFB81C]">
@@ -171,12 +170,7 @@ export default function CategoryPageClient({
 
 function HeroArticle({ item }: { item: NewsResponseItem }) {
   return (
-    <a
-      href={item.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group block"
-    >
+    <a href={readerHref(item.link)} className="group block">
       <Thumbnail
         src={item.imageUrl}
         label={item.categories[0] ? labelOf(item.categories[0]) : "KBCI"}
