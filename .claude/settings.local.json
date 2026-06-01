@@ -12,7 +12,8 @@
       "Bash(npm run *)",
       "Bash(npm install *)",
       "mcp__355ad8c4-624e-4a25-a68d-33b23d346064__list_tables",
-      "mcp__355ad8c4-624e-4a25-a68d-33b23d346064__apply_migration"
+      "mcp__355ad8c4-624e-4a25-a68d-33b23d346064__apply_migration",
+      "mcp__f4508fa3-056b-46f6-8734-ae0f3ba4671e__get_runtime_logs"
     ]
   }
 }

@@ -7,6 +7,7 @@ import { formatRelative } from "@/lib/format";
 import { readerHref } from "@/lib/links";
 import {
   byRelevance,
+  clusterArticles,
   dedupeArticles,
   hostOf,
   stripHtml,
@@ -50,7 +51,7 @@ export default function CategoryPageClient({
   }, []);
 
   const dedupedAll = useMemo(
-    () => dedupeArticles(items as Article[]) as NewsResponseItem[],
+    () => clusterArticles(dedupeArticles(items as Article[])) as NewsResponseItem[],
     [items],
   );
 

@@ -59,6 +59,109 @@ export const byRelevance = (a: Article, b: Article): number => {
 export const byDate = (a: Article, b: Article): number =>
   new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
 
+// 여러 매체가 같은 사안을 각자 다른 제목으로 보도해 생기는 "유사 중복"을 묶는다.
+// 제목의 의미 토큰(2자 이상)을 비교해, 같은 날 + 공통 토큰 3개 이상 + 자카드 0.3 이상이면
+// 같은 사안으로 보고 한 건만 남긴다.
+const CLUSTER_STOP = new Set([
+  "위한", "통해", "대한", "관련", "이벤트", "행사", "나서", "출시", "오늘",
+  "최대", "우리", "지난", "올해", "추진", "확대", "강화", "예정", "발표",
+]);
+
+function meaningfulTokens(title: string): string[] {
+  return Array.from(
+    new Set(
+      stripHtml(title)
+        .replace(/\[[^\]]*\]/g, "")
+        .replace(/\([^)]*\)/g, "")
+        .split(/[^\p{L}\p{N}]+/u)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2 && !CLUSTER_STOP.has(t)),
+    ),
+  );
+}
+
+function dayKey(pubDate: string): string {
+  const d = new Date(pubDate);
+  if (Number.isNaN(d.getTime())) return "_";
+  return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+}
+
+export function clusterArticles(items: Article[]): Article[] {
+  const n = items.length;
+  if (n < 2) return items;
+
+  const parent = items.map((_, i) => i);
+  const find = (x: number): number => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  };
+
+  const tokens = items.map((it) => meaningfulTokens(it.title));
+
+  // 같은 날짜끼리만 비교 (성능 + 오병합 방지)
+  const buckets = new Map<string, number[]>();
+  items.forEach((it, i) => {
+    const k = dayKey(it.pubDate);
+    const arr = buckets.get(k);
+    if (arr) arr.push(i);
+    else buckets.set(k, [i]);
+  });
+
+  for (const idxs of buckets.values()) {
+    for (let a = 0; a < idxs.length; a++) {
+      for (let b = a + 1; b < idxs.length; b++) {
+        const i = idxs[a];
+        const j = idxs[b];
+        const ti = tokens[i];
+        const tj = tokens[j];
+        if (ti.length < 3 || tj.length < 3) continue;
+        const setj = new Set(tj);
+        let shared = 0;
+        for (const t of ti) if (setj.has(t)) shared++;
+        if (shared < 3) continue;
+        const jaccard = shared / (ti.length + tj.length - shared);
+        if (jaccard >= 0.3) union(i, j);
+      }
+    }
+  }
+
+  const groups = new Map<number, number[]>();
+  items.forEach((_, i) => {
+    const r = find(i);
+    const arr = groups.get(r);
+    if (arr) arr.push(i);
+    else groups.set(r, [i]);
+  });
+
+  const result: Article[] = [];
+  for (const idxs of groups.values()) {
+    if (idxs.length === 1) {
+      result.push(items[idxs[0]]);
+      continue;
+    }
+    const members = idxs.map((i) => items[i]);
+    const rep = { ...members.slice().sort(byRelevance)[0] };
+    const cats = new Set<string>();
+    members.forEach((m) => m.categories.forEach((c) => cats.add(c)));
+    rep.categories = Array.from(cats);
+    if (!rep.imageUrl) {
+      const withImg = members.find((m) => m.imageUrl);
+      if (withImg) rep.imageUrl = withImg.imageUrl;
+    }
+    result.push(rep);
+  }
+
+  return result.sort(byDate);
+}
+
 export const isLegalArticle = (item: Article): boolean => {
   const text = stripHtml(item.title);
   const legalRelevant =

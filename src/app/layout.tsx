@@ -19,6 +19,12 @@ export const metadata: Metadata = {
   description: "KB신용정보 사내 뉴스 모니터링",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

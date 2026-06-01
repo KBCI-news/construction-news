@@ -11,14 +11,13 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@supabase/supabase-js": "^2.104.0",
-    "jsdom": "^29.1.1",
+    "linkedom": "^0.18.12",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",
     "sanitize-html": "^2.17.4"
   },
   "devDependencies": {
-    "@types/jsdom": "^28.0.3",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
