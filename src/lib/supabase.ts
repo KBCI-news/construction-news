@@ -29,5 +29,6 @@ export type ArticleRow = {
   pub_date: string;
   source_host: string | null;
   categories: string[];
+  image_url: string | null;
   collected_at: string;
 };

@@ -4,24 +4,44 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1a1a1a;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* 고령 사용자 가독성을 위해 기본 폰트 크기를 키운다 */
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
+  line-height: 1.6;
+  word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+/* 인쇄 / PDF 저장 시 화면 전용 요소 숨김 */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  html {
+    font-size: 14px;
+  }
+  body {
+    background: #ffffff;
+  }
+  .print-article {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

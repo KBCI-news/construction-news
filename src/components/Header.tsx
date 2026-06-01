@@ -15,7 +15,7 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-30 bg-gray-900">
+    <header className="no-print sticky top-0 z-30 bg-gray-900">
       <div className="h-1 w-full bg-[#FFB81C]" />
       <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-3.5 sm:px-8 sm:py-4">
         <Link href="/" className="flex items-center gap-3">

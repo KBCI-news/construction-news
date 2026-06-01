@@ -2,35 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NewsResponseItem } from "@/app/api/news/route";
-import { CATEGORIES, FEATURED_KEYWORDS } from "@/lib/categories";
-import { formatRelative, hostOf, stripHtml } from "@/lib/format";
+import { CATEGORIES } from "@/lib/categories";
+import { formatRelative } from "@/lib/format";
+import {
+  byRelevance,
+  dedupeArticles,
+  hostOf,
+  stripHtml,
+  type Article,
+} from "@/lib/news";
 import { NewsCard } from "@/components/NewsCard";
+import { Thumbnail } from "@/components/Thumbnail";
+import { PrintLink } from "@/components/PrintLink";
 
 const labelOf = (id: string) =>
   CATEGORIES.find((c) => c.id === id)?.label ?? id;
-
-const normalizeTitle = (title: string): string =>
-  stripHtml(title)
-    .toLowerCase()
-    .replace(/\[[^\]]*\]/g, "")
-    .replace(/\([^)]*\)/g, "")
-    .replace(/[^\p{L}\p{N}]/gu, "")
-    .slice(0, 40);
-
-const relevance = (item: NewsResponseItem): number => {
-  const text = stripHtml(item.title);
-  const featuredBonus = FEATURED_KEYWORDS.some((k) => text.includes(k))
-    ? 5
-    : 0;
-  return item.categories.length * 2 + featuredBonus;
-};
-
-const sortByRelevance = (a: NewsResponseItem, b: NewsResponseItem) => {
-  const ra = relevance(a);
-  const rb = relevance(b);
-  if (rb !== ra) return rb - ra;
-  return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
-};
 
 export default function CategoryPageClient({
   categoryId,
@@ -62,46 +48,48 @@ export default function CategoryPageClient({
     return () => controller.abort();
   }, []);
 
-  const dedupedAll = useMemo(() => {
-    const map = new Map<string, NewsResponseItem>();
-    for (const item of items) {
-      const key = normalizeTitle(item.title) || item.link;
-      const existing = map.get(key);
-      if (existing) {
-        const merged = new Set([...existing.categories, ...item.categories]);
-        existing.categories = Array.from(merged);
-      } else {
-        map.set(key, { ...item, categories: [...item.categories] });
-      }
-    }
-    return Array.from(map.values());
-  }, [items]);
+  const dedupedAll = useMemo(
+    () => dedupeArticles(items as Article[]) as NewsResponseItem[],
+    [items],
+  );
 
-  const categoryItems = useMemo(() => {
-    return dedupedAll
-      .filter((it) => it.categories.includes(categoryId))
-      .slice()
-      .sort(sortByRelevance);
-  }, [dedupedAll, categoryId]);
+  const categoryItems = useMemo(
+    () =>
+      dedupedAll
+        .filter((it) => it.categories.includes(categoryId))
+        .sort(byRelevance),
+    [dedupedAll, categoryId],
+  );
 
   const topRanked = useMemo(
-    () => dedupedAll.slice().sort(sortByRelevance).slice(0, 5),
-    [dedupedAll],
+    () => categoryItems.slice(0, 5),
+    [categoryItems],
   );
 
   return (
     <div className="space-y-8">
       <div className="border-b-2 border-gray-900 pb-3">
-        <p className="text-[11px] font-bold tracking-widest text-[#FFB81C]">
-          KBCI NEWS · {categoryLabel.toUpperCase()}
-        </p>
-        <h1 className="mt-2 text-[28px] font-extrabold tracking-tight text-gray-900 sm:text-[36px]">
-          {categoryLabel}
-        </h1>
-        <p className="mt-1 text-[12px] text-gray-500 sm:text-[13px]">
-          관련도 높은 순 ·{" "}
-          {loading ? "..." : `총 ${categoryItems.length}건`}
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[12px] font-bold tracking-widest text-[#9A7A12]">
+              KBCI NEWS · {categoryLabel.toUpperCase()}
+            </p>
+            <h1 className="mt-2 text-[28px] font-extrabold tracking-tight text-gray-900 sm:text-[36px]">
+              {categoryLabel}
+            </h1>
+            <p className="mt-1 text-[13px] text-gray-500 sm:text-[14px]">
+              관련도 높은 순 ·{" "}
+              {loading ? "..." : `총 ${categoryItems.length}건`}
+            </p>
+          </div>
+          {categoryItems.length > 0 && (
+            <PrintLink
+              links={categoryItems.slice(0, 20).map((it) => it.link)}
+              label="상위 20건 출력"
+              className="no-print inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            />
+          )}
+        </div>
       </div>
 
       {error && (
@@ -134,7 +122,7 @@ export default function CategoryPageClient({
         <aside>
           <div className="lg:sticky lg:top-[140px]">
             <div className="border-b-2 border-gray-900 pb-2">
-              <h2 className="text-[12px] font-bold tracking-widest text-gray-900">
+              <h2 className="text-[13px] font-bold tracking-widest text-gray-900">
                 주요 뉴스 TOP 5
               </h2>
             </div>
@@ -161,10 +149,10 @@ export default function CategoryPageClient({
                         {String(idx + 1).padStart(2, "0")}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-[14px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                        <p className="line-clamp-2 text-[14.5px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
                           {stripHtml(item.title)}
                         </p>
-                        <p className="mt-1 text-[11px] text-gray-500">
+                        <p className="mt-1 text-[12px] text-gray-500">
                           {hostOf(item.originallink)} —{" "}
                           {formatRelative(item.pubDate)}
                         </p>
@@ -189,15 +177,25 @@ function HeroArticle({ item }: { item: NewsResponseItem }) {
       rel="noopener noreferrer"
       className="group block"
     >
+      <Thumbnail
+        src={item.imageUrl}
+        label={item.categories[0] ? labelOf(item.categories[0]) : "KBCI"}
+        className="aspect-[16/9] w-full rounded-xl"
+      />
       {item.categories.length > 0 && (
-        <div className="mb-3 text-[11px] font-bold tracking-wider text-[#FFB81C]">
+        <div className="mb-2 mt-4 text-[12px] font-bold tracking-wider text-[#9A7A12]">
           {item.categories.map((id) => labelOf(id)).join(" · ")}
         </div>
       )}
       <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[32px]">
         {stripHtml(item.title)}
       </h2>
-      <p className="mt-3 text-[12px] text-gray-500 sm:text-[13px]">
+      {item.description && (
+        <p className="mt-3 line-clamp-2 text-[15px] leading-relaxed text-gray-600 sm:text-[16px]">
+          {stripHtml(item.description)}
+        </p>
+      )}
+      <p className="mt-3 text-[13px] text-gray-500 sm:text-[14px]">
         <span className="font-medium text-gray-700">
           {hostOf(item.originallink)}
         </span>

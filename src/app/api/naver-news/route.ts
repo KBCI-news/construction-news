@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCategory } from "@/lib/categories";
+import { getCategory, keywordsForCategory } from "@/lib/categories";
 
 export type NaverNewsItem = {
   title: string;
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
-    queries = category.keywords;
+    queries = keywordsForCategory(categoryId);
   } else if (q) {
     queries = [q];
   } else {

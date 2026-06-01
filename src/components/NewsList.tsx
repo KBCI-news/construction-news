@@ -1,34 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
-import { CATEGORIES, FEATURED_KEYWORDS } from "@/lib/categories";
+import type { TrendingResponse } from "@/app/api/trending/route";
+import { CATEGORIES, HOT_KEYWORDS } from "@/lib/categories";
 import { filterFeatured, type TimeRange } from "@/lib/featured";
-import { formatRelative, hostOf, stripHtml } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
+import {
+  byDate,
+  byRelevance,
+  countKeywords,
+  dedupeArticles,
+  hostOf,
+  isLegalArticle,
+  stripHtml,
+  type Article,
+} from "@/lib/news";
 import { NewsCard } from "@/components/NewsCard";
+import { Thumbnail } from "@/components/Thumbnail";
+import { PrintLink } from "@/components/PrintLink";
 
 type EnrichedNewsItem = NewsResponseItem;
-
-const ALL_TAB = "__all__";
-
-const relevanceScore = (item: EnrichedNewsItem): number => {
-  const text = stripHtml(item.title);
-  const featuredBonus = FEATURED_KEYWORDS.some((k) => text.includes(k))
-    ? 5
-    : 0;
-  return item.categories.length * 2 + featuredBonus;
-};
-
-const normalizeTitle = (title: string): string => {
-  return stripHtml(title)
-    .toLowerCase()
-    .replace(/\[[^\]]*\]/g, "")
-    .replace(/\([^)]*\)/g, "")
-    .replace(/[^\p{L}\p{N}]/gu, "")
-    .slice(0, 40);
-};
 
 const labelOf = (id: string) =>
   CATEGORIES.find((c) => c.id === id)?.label ?? id;
@@ -40,6 +34,15 @@ type State =
   | { mode: "search"; q: string; items: NaverNewsItem[] }
   | null;
 
+function logSearch(query: string) {
+  // 인기 검색어 집계용 — 실패해도 무시
+  fetch("/api/search-log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  }).catch(() => {});
+}
+
 export default function NewsList() {
   const [data, setData] = useState<State>(null);
   const [loading, setLoading] = useState(true);
@@ -47,9 +50,16 @@ export default function NewsList() {
 
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [trending, setTrending] = useState<TrendingResponse["searches"]>([]);
 
   const [featuredRange, setFeaturedRange] = useState<TimeRange>("daily");
-  const fullFeedRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    fetch("/api/trending")
+      .then((res) => res.json())
+      .then((json: TrendingResponse) => setTrending(json.searches ?? []))
+      .catch(() => setTrending([]));
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -91,24 +101,22 @@ export default function NewsList() {
 
   const allItems = useMemo<EnrichedNewsItem[]>(() => {
     if (data?.mode !== "all") return [];
-    const map = new Map<string, EnrichedNewsItem>();
-    for (const item of data.items) {
-      const norm = normalizeTitle(item.title);
-      const key = norm || item.link;
-      const existing = map.get(key);
-      if (existing) {
-        const merged = new Set([...existing.categories, ...item.categories]);
-        existing.categories = Array.from(merged);
-      } else {
-        map.set(key, { ...item, categories: [...item.categories] });
-      }
-    }
-    return Array.from(map.values());
+    return dedupeArticles(data.items as Article[]) as EnrichedNewsItem[];
   }, [data]);
 
   const featured = useMemo(
     () => filterFeatured(allItems, featuredRange, 10),
     [allItems, featuredRange],
+  );
+
+  const legalItems = useMemo(
+    () => allItems.filter(isLegalArticle).sort(byDate).slice(0, 6),
+    [allItems],
+  );
+
+  const hotKeywords = useMemo(
+    () => countKeywords(allItems, HOT_KEYWORDS, 10),
+    [allItems],
   );
 
   const categoryTops = useMemo(() => {
@@ -122,7 +130,7 @@ export default function NewsList() {
   }, [allItems]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { [ALL_TAB]: allItems.length };
+    const c: Record<string, number> = {};
     for (const cat of CATEGORIES) {
       c[cat.id] = allItems.filter((it) =>
         it.categories.includes(cat.id),
@@ -131,20 +139,22 @@ export default function NewsList() {
     return c;
   }, [allItems]);
 
-  const sortedItems = useMemo(() => {
-    return allItems.slice().sort((a, b) => {
-      const sa = relevanceScore(a);
-      const sb = relevanceScore(b);
-      if (sb !== sa) return sb - sa;
-      return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
-    });
-  }, [allItems]);
+  const sortedItems = useMemo(
+    () => allItems.slice().sort(byRelevance),
+    [allItems],
+  );
+
+  const runSearch = (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setSearchInput(trimmed);
+    setSearchQuery(trimmed);
+    logSearch(trimmed);
+  };
 
   const onSubmitSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const q = searchInput.trim();
-    if (!q) return;
-    setSearchQuery(q);
+    runSearch(searchInput);
   };
 
   const clearSearch = () => {
@@ -153,15 +163,24 @@ export default function NewsList() {
   };
 
   return (
-    <div className="space-y-8 sm:space-y-12">
-      <SearchBar
-        value={searchInput}
-        onChange={setSearchInput}
-        onSubmit={onSubmitSearch}
-      />
+    <div className="space-y-10 sm:space-y-14">
+      <div className="space-y-4">
+        <SearchBar
+          value={searchInput}
+          onChange={setSearchInput}
+          onSubmit={onSubmitSearch}
+        />
+        {!searchQuery && (
+          <TrendingBar
+            searches={trending}
+            hotKeywords={hotKeywords}
+            onPick={runSearch}
+          />
+        )}
+      </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        <div className="border-l-4 border-rose-500 bg-rose-50 p-4 text-sm text-rose-700">
           {error}
         </div>
       )}
@@ -170,7 +189,7 @@ export default function NewsList() {
         <section className="space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">
-              <span className="text-blue-600">&quot;{searchQuery}&quot;</span>{" "}
+              <span className="text-[#9A7A12]">&quot;{searchQuery}&quot;</span>{" "}
               검색 결과
               {data?.mode === "search" && (
                 <span className="ml-2 text-base font-normal text-gray-500">
@@ -206,23 +225,15 @@ export default function NewsList() {
             loading={loading}
           />
 
+          <LegalSection items={legalItems} loading={loading} />
+
           <CategoryHighlights
             tops={categoryTops}
             counts={counts}
             loading={loading}
           />
 
-          <RankedLists
-            allItems={allItems}
-            sortedItems={sortedItems}
-            loading={loading}
-          />
-
-          <FullFeed
-            sectionRef={fullFeedRef}
-            items={sortedItems}
-            loading={loading}
-          />
+          <FullFeed items={sortedItems} loading={loading} />
         </>
       )}
     </div>
@@ -258,15 +269,93 @@ function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="키워드를 입력해 검색하세요"
-        className="w-full border-b-2 border-gray-300 bg-white py-3 pl-9 pr-20 text-[16px] font-semibold text-gray-900 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] sm:text-[18px]"
+        className="w-full border-b-2 border-gray-300 bg-white py-3.5 pl-9 pr-20 text-[17px] font-semibold text-gray-900 outline-none transition-colors placeholder:font-normal placeholder:text-gray-400 focus:border-[#FFB81C] sm:text-[19px]"
       />
       <button
         type="submit"
-        className="absolute right-0 top-1/2 -translate-y-1/2 px-3 py-2 text-[13px] font-bold tracking-wider text-gray-900 hover:text-[#FFB81C] sm:text-[14px]"
+        className="absolute right-0 top-1/2 -translate-y-1/2 px-3 py-2 text-[14px] font-bold tracking-wider text-gray-900 hover:text-[#9A7A12]"
       >
         검색
       </button>
     </form>
+  );
+}
+
+function TrendingBar({
+  searches,
+  hotKeywords,
+  onPick,
+}: {
+  searches: { query: string; count: number }[];
+  hotKeywords: { keyword: string; count: number }[];
+  onPick: (q: string) => void;
+}) {
+  const hasSearches = searches.length > 0;
+  return (
+    <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+      <KeywordRow
+        title="인기 검색어"
+        empty="아직 검색 데이터가 없습니다"
+        chips={searches.map((s) => s.query)}
+        ranked
+        onPick={onPick}
+        show={hasSearches}
+      />
+      <KeywordRow
+        title="핫 키워드"
+        empty="집계 중입니다"
+        chips={hotKeywords.map((k) => k.keyword)}
+        ranked={false}
+        onPick={onPick}
+        show
+      />
+    </div>
+  );
+}
+
+function KeywordRow({
+  title,
+  empty,
+  chips,
+  ranked,
+  onPick,
+  show,
+}: {
+  title: string;
+  empty: string;
+  chips: string[];
+  ranked: boolean;
+  onPick: (q: string) => void;
+  show: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 shrink-0 text-[12px] font-bold tracking-widest text-gray-900">
+        {title}
+      </span>
+      {show && chips.length > 0 ? (
+        <div className="flex flex-wrap gap-x-2 gap-y-1.5">
+          {chips.map((chip, i) => (
+            <button
+              key={chip}
+              onClick={() => onPick(chip)}
+              className="group inline-flex items-center gap-1 text-[13.5px] text-gray-600 transition-colors hover:text-[#9A7A12]"
+            >
+              {ranked && (
+                <span className="font-extrabold tabular-nums text-[#FFB81C]">
+                  {i + 1}
+                </span>
+              )}
+              <span className="font-semibold group-hover:underline">
+                {chip}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <span className="text-[13px] text-gray-400">{empty}</span>
+      )}
+    </div>
   );
 }
 
@@ -284,6 +373,7 @@ function HeroSection({
   const main = items[0];
   const subStories = items.slice(1, 5);
   const sideStories = items.slice(5, 10);
+  const allLinks = items.map((it) => it.link);
 
   return (
     <section>
@@ -318,9 +408,16 @@ function HeroSection({
               주간
             </button>
           </div>
+          {allLinks.length > 0 && (
+            <PrintLink
+              links={allLinks}
+              label="전체 출력"
+              className="no-print inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            />
+          )}
           <Link
             href="/featured"
-            className="border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#FFB81C]"
+            className="border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
             + 더보기
           </Link>
@@ -342,15 +439,25 @@ function HeroSection({
               rel="noopener noreferrer"
               className="group block"
             >
+              <Thumbnail
+                src={main.imageUrl}
+                label={main.categories[0] ? labelOf(main.categories[0]) : "KBCI"}
+                className="aspect-[16/9] w-full rounded-xl"
+              />
               {main.categories.length > 0 && (
-                <div className="mb-3 text-[11px] font-bold tracking-wider text-[#FFB81C]">
+                <div className="mb-2 mt-4 text-[12px] font-bold tracking-wider text-[#9A7A12]">
                   {main.categories.map((id) => labelOf(id)).join(" · ")}
                 </div>
               )}
-              <h3 className="text-[26px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[32px]">
+              <h3 className="text-[26px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[34px]">
                 {stripHtml(main.title)}
               </h3>
-              <p className="mt-3 text-[12px] text-gray-500 sm:text-[13px]">
+              {main.description && (
+                <p className="mt-3 line-clamp-2 text-[15px] leading-relaxed text-gray-600 sm:text-[16px]">
+                  {stripHtml(main.description)}
+                </p>
+              )}
+              <p className="mt-3 text-[13px] text-gray-500">
                 <span className="font-medium text-gray-700">
                   {hostOf(main.originallink)}
                 </span>
@@ -369,18 +476,29 @@ function HeroSection({
                         href={item.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group block py-4 transition-colors hover:bg-gray-50/40"
+                        className="group flex items-start gap-4 py-4 transition-colors hover:bg-gray-50/40"
                       >
-                        <p className="text-[16px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
-                          {stripHtml(item.title)}
-                        </p>
-                        <p className="mt-1.5 text-[11px] text-gray-500">
-                          <span className="font-medium text-gray-700">
-                            {hostOf(item.originallink)}
-                          </span>
-                          <span className="mx-1.5">—</span>
-                          {formatRelative(item.pubDate)}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[17px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                            {stripHtml(item.title)}
+                          </p>
+                          <p className="mt-1.5 text-[12px] text-gray-500">
+                            <span className="font-medium text-gray-700">
+                              {hostOf(item.originallink)}
+                            </span>
+                            <span className="mx-1.5">—</span>
+                            {formatRelative(item.pubDate)}
+                          </p>
+                        </div>
+                        <Thumbnail
+                          src={item.imageUrl}
+                          label={
+                            item.categories[0]
+                              ? labelOf(item.categories[0])
+                              : "KBCI"
+                          }
+                          className="h-[64px] w-[92px] shrink-0 rounded-lg"
+                        />
                       </a>
                     </li>
                   ))}
@@ -391,7 +509,7 @@ function HeroSection({
 
           <aside>
             <div className="border-b-2 border-gray-900 pb-2">
-              <h3 className="text-[12px] font-bold tracking-widest text-gray-900">
+              <h3 className="text-[13px] font-bold tracking-widest text-gray-900">
                 핫뉴스 TOP 5
               </h3>
             </div>
@@ -413,10 +531,10 @@ function HeroSection({
                         {String(idx + 1).padStart(2, "0")}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-[14px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                        <p className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
                           {stripHtml(item.title)}
                         </p>
-                        <p className="mt-1 text-[11px] text-gray-500">
+                        <p className="mt-1 text-[12px] text-gray-500">
                           {hostOf(item.originallink)} —{" "}
                           {formatRelative(item.pubDate)}
                         </p>
@@ -433,155 +551,77 @@ function HeroSection({
   );
 }
 
-function RankedLists({
-  allItems,
-  sortedItems,
-  loading,
-}: {
-  allItems: EnrichedNewsItem[];
-  sortedItems: EnrichedNewsItem[];
-  loading: boolean;
-}) {
-  const byRelevance = sortedItems.slice(0, 5);
-  const byDate = useMemo(
-    () =>
-      allItems
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime(),
-        )
-        .slice(0, 5),
-    [allItems],
-  );
-  const topPerCategory = useMemo(() => {
-    const out: EnrichedNewsItem[] = [];
-    for (const cat of CATEGORIES) {
-      const found = sortedItems.find((it) => it.categories.includes(cat.id));
-      if (found && !out.find((o) => o.link === found.link)) out.push(found);
-      if (out.length >= 5) break;
-    }
-    return out;
-  }, [sortedItems]);
-
-  return (
-    <section>
-      <SectionHeader title="뉴스 랭킹" subtitle="다양한 기준으로 보기" />
-      <div className="grid gap-8 md:grid-cols-3 md:gap-10">
-        <RankedColumn
-          title="주요 뉴스"
-          subtitle="관련도순"
-          items={byRelevance}
-          loading={loading}
-        />
-        <RankedColumn
-          title="최신 뉴스"
-          subtitle="시간순"
-          items={byDate}
-          loading={loading}
-        />
-        <RankedColumn
-          title="카테고리 핵심"
-          subtitle="카테고리별"
-          items={topPerCategory}
-          loading={loading}
-        />
-      </div>
-    </section>
-  );
-}
-
-function RankedColumn({
-  title,
-  subtitle,
+function LegalSection({
   items,
   loading,
 }: {
-  title: string;
-  subtitle: string;
   items: EnrichedNewsItem[];
   loading: boolean;
 }) {
+  if (!loading && items.length === 0) return null;
   return (
-    <div>
-      <div className="border-b-2 border-gray-900 pb-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-[14px] font-bold tracking-widest text-gray-900">
-            {title}
-          </h3>
-          <p className="text-[11px] text-gray-500">{subtitle}</p>
-        </div>
-      </div>
+    <section>
+      <SectionHeader
+        title="법·제도 동향"
+        subtitle="관련 법령 개정·제재·위반 사례"
+      />
       {loading ? (
-        <ul className="mt-5 space-y-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <li key={i} className="animate-pulse">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="animate-pulse">
               <div className="h-4 w-full rounded bg-gray-200" />
-              <div className="mt-1 h-3 w-24 rounded bg-gray-100" />
-            </li>
+              <div className="mt-2 h-3 w-24 rounded bg-gray-100" />
+            </div>
           ))}
-        </ul>
-      ) : items.length === 0 ? (
-        <p className="mt-5 text-sm text-gray-400">뉴스가 없습니다.</p>
+        </div>
       ) : (
-        <ol className="mt-5 space-y-5">
-          {items.map((item, idx) => (
-            <li key={item.link}>
-              <a
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex gap-3"
-              >
-                <span className="shrink-0 text-[16px] font-extrabold tabular-nums text-[#FFB81C]">
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[14px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
-                    {stripHtml(item.title)}
-                  </p>
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    {hostOf(item.originallink)} —{" "}
-                    {formatRelative(item.pubDate)}
-                  </p>
-                </div>
-              </a>
-            </li>
+        <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item) => (
+            <a
+              key={item.link}
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex gap-3 border-l-2 border-[#FFB81C] pl-3"
+            >
+              <div className="min-w-0">
+                <p className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                  {stripHtml(item.title)}
+                </p>
+                <p className="mt-1 text-[12px] text-gray-500">
+                  {hostOf(item.originallink)} — {formatRelative(item.pubDate)}
+                </p>
+              </div>
+            </a>
           ))}
-        </ol>
+        </div>
       )}
-    </div>
+    </section>
   );
 }
 
 function HeroSkeleton() {
   return (
-    <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-      <div className="space-y-3 lg:col-span-2">
-        <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
-          <div className="h-3 w-32 rounded bg-gray-200" />
-          <div className="mt-4 h-6 w-3/4 rounded bg-gray-200" />
-          <div className="mt-2 h-6 w-1/2 rounded bg-gray-200" />
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white">
+    <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
+      <div className="lg:col-span-2">
+        <div className="aspect-[16/9] w-full animate-pulse rounded-xl bg-gray-200" />
+        <div className="mt-4 h-7 w-3/4 animate-pulse rounded bg-gray-200" />
+        <div className="mt-2 h-7 w-1/2 animate-pulse rounded bg-gray-200" />
+        <div className="mt-6 space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="animate-pulse border-b border-gray-200 px-5 py-4 last:border-b-0">
-              <div className="h-4 w-3/4 rounded bg-gray-200" />
-              <div className="mt-2 h-3 w-32 rounded bg-gray-100" />
+            <div key={i} className="flex gap-4">
+              <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
             </div>
           ))}
         </div>
       </div>
-      <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5">
-        <div className="h-4 w-20 rounded bg-gray-200" />
-        <div className="mt-4 space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i}>
-              <div className="h-4 w-full rounded bg-gray-200" />
-              <div className="mt-1 h-3 w-24 rounded bg-gray-100" />
-            </div>
-          ))}
-        </div>
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="animate-pulse">
+            <div className="h-4 w-full rounded bg-gray-200" />
+            <div className="mt-1 h-3 w-24 rounded bg-gray-100" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -598,10 +638,7 @@ function CategoryHighlights({
 }) {
   return (
     <section>
-      <SectionHeader
-        title="카테고리별 인사이트"
-        subtitle="주제별 최신 뉴스"
-      />
+      <SectionHeader title="카테고리별 인사이트" subtitle="주제별 최신 뉴스" />
       <div className="grid gap-8 md:grid-cols-2 md:gap-10 lg:grid-cols-3">
         {CATEGORIES.map((cat) => {
           const items = tops[cat.id] ?? [];
@@ -612,10 +649,10 @@ function CategoryHighlights({
                 className="group flex w-full items-baseline justify-between gap-2 border-b border-gray-300 pb-2"
                 title="전체보기"
               >
-                <h3 className="text-[14px] font-bold tracking-widest text-gray-900 group-hover:text-[#FFB81C]">
+                <h3 className="text-[15px] font-bold tracking-widest text-gray-900 group-hover:text-[#9A7A12]">
                   {cat.label}
                 </h3>
-                <span className="shrink-0 whitespace-nowrap text-[11px] font-medium text-gray-400 group-hover:text-[#FFB81C]">
+                <span className="shrink-0 whitespace-nowrap text-[12px] font-medium text-gray-400 group-hover:text-[#9A7A12]">
                   {counts[cat.id] ?? 0}건 →
                 </span>
               </Link>
@@ -629,7 +666,7 @@ function CategoryHighlights({
                   ))}
                 </ul>
               ) : items.length === 0 ? (
-                <p className="mt-4 text-[13px] text-gray-400">
+                <p className="mt-4 text-[14px] text-gray-400">
                   아직 뉴스가 없습니다.
                 </p>
               ) : (
@@ -640,15 +677,22 @@ function CategoryHighlights({
                         href={item.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group block py-3 transition-colors hover:bg-gray-50/40"
+                        className="group flex items-start gap-3 py-3 transition-colors hover:bg-gray-50/40"
                       >
-                        <p className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
-                          {stripHtml(item.title)}
-                        </p>
-                        <p className="mt-1 text-[11px] text-gray-500">
-                          {hostOf(item.originallink)} —{" "}
-                          {formatRelative(item.pubDate)}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-[15.5px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
+                            {stripHtml(item.title)}
+                          </p>
+                          <p className="mt-1 text-[12px] text-gray-500">
+                            {hostOf(item.originallink)} —{" "}
+                            {formatRelative(item.pubDate)}
+                          </p>
+                        </div>
+                        <Thumbnail
+                          src={item.imageUrl}
+                          label={cat.label}
+                          className="h-[52px] w-[72px] shrink-0 rounded-md"
+                        />
                       </a>
                     </li>
                   ))}
@@ -663,16 +707,14 @@ function CategoryHighlights({
 }
 
 function FullFeed({
-  sectionRef,
   items,
   loading,
 }: {
-  sectionRef: React.RefObject<HTMLElement>;
   items: AnyItem[];
   loading: boolean;
 }) {
   return (
-    <section ref={sectionRef} className="scroll-mt-32">
+    <section className="scroll-mt-32">
       <SectionHeader
         title="최신 뉴스"
         subtitle={`관련도 높은 순 · 총 ${items.length}건`}
@@ -706,11 +748,11 @@ function SectionHeader({
     <div className="mb-5 border-b-2 border-gray-900 pb-2 sm:mb-6 sm:pb-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h2 className="text-[22px] font-extrabold tracking-tight text-gray-900 sm:text-[26px]">
+          <h2 className="text-[22px] font-extrabold tracking-tight text-gray-900 sm:text-[27px]">
             {title}
           </h2>
           {subtitle && (
-            <p className="text-[12px] text-gray-500 sm:text-[13px]">
+            <p className="text-[13px] text-gray-500 sm:text-[14px]">
               {subtitle}
             </p>
           )}
@@ -723,15 +765,15 @@ function SectionHeader({
 
 function SkeletonList() {
   return (
-    <div className="space-y-2">
+    <div className="divide-y divide-gray-200">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="animate-pulse rounded-xl border border-gray-200 bg-white p-4"
-        >
-          <div className="h-3 w-32 rounded bg-gray-200" />
-          <div className="mt-3 h-5 w-3/4 rounded bg-gray-200" />
-          <div className="mt-2 h-4 w-full rounded bg-gray-100" />
+        <div key={i} className="flex items-start gap-4 py-6">
+          <div className="min-w-0 flex-1">
+            <div className="h-3 w-24 animate-pulse rounded bg-gray-200" />
+            <div className="mt-3 h-5 w-3/4 animate-pulse rounded bg-gray-200" />
+            <div className="mt-2 h-4 w-full animate-pulse rounded bg-gray-100" />
+          </div>
+          <div className="h-[72px] w-[104px] shrink-0 animate-pulse rounded-lg bg-gray-200 sm:h-[108px] sm:w-[168px]" />
         </div>
       ))}
     </div>
@@ -740,7 +782,7 @@ function SkeletonList() {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+    <div className="border-y-2 border-gray-200 py-16 text-center text-sm text-gray-500">
       {message}
     </div>
   );
