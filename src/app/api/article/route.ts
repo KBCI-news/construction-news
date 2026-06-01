@@ -97,12 +97,18 @@ const PROMO_RE =
 const EMAIL_RE = /[\w.+-]+@[\w.-]+\.\w{2,}/;
 const BYLINE_RE = /^[[(<【]?\s*[가-힣]{2,4}\s*(기자|특파원|논설위원|편집위원|인턴기자)\b/;
 const SENTENCE_END_RE = /[다요음함됨임죠죵]\.?$/; // 본문 문장은 보통 이렇게 끝남
+// 언론사 페이지의 UI 위젯(글자크기 조절, 스크랩, 공유 등)이 본문에 섞이는 것 제거
+const UI_RE =
+  /(글자\s*크기|글씨\s*크기|폰트\s*크기|기사\s*스크랩|스크랩하기|인쇄하기|프린트하기|url\s*복사|메일로\s*보내기)/i;
 
 function isJunk(text: string): boolean {
   const t = text.replace(/\s+/g, " ").trim();
   if (!t) return false;
+  // 글자크기 버튼("가") 등 의미 없는 초단문 UI
+  if (t === "가" || t === "가가" || t === "가나다") return true;
   if (COPY_RE.test(t) && t.length < 200) return true;
   if (t.length <= 60 && PROMO_RE.test(t)) return true;
+  if (t.length <= 60 && UI_RE.test(t)) return true;
   // 바이라인: "이종용 기자", "홍길동 기자 hong@x.com" 등 (문장형은 제외)
   if (t.length <= 35 && BYLINE_RE.test(t) && !SENTENCE_END_RE.test(t)) return true;
   // 이메일만 있는 짧은 줄

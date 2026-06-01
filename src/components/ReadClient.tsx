@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ArticleContent } from "@/app/api/article/route";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import { CATEGORIES } from "@/lib/categories";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
-import { buildPrintHref } from "@/components/PrintLink";
 
 const labelOf = (id: string) =>
   CATEGORIES.find((c) => c.id === id)?.label ?? id;
@@ -86,14 +84,12 @@ export default function ReadClient() {
           ← 목록으로
         </button>
         <div className="flex items-center gap-2">
-          <Link
-            href={buildPrintHref([url])}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => window.print()}
             className="inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
             🖨 PDF 출력
-          </Link>
+          </button>
           <a
             href={url}
             target="_blank"
