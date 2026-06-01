@@ -1,8 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CATEGORIES } from "@/lib/categories";
+
+// public/kb-logo.png(또는 .svg)가 있으면 그 로고를, 없으면 KB 옐로우 타일로 폴백
+function BrandLogo() {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFB81C] text-[15px] font-extrabold tracking-tight text-gray-900">
+        KB
+      </div>
+    );
+  }
+  return (
+    // 회사 로고 이미지(임의 자산)라 next/image 대신 일반 img 사용
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/kb-logo.png"
+      alt="KB"
+      className="h-9 w-auto"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -19,9 +42,7 @@ export function Header() {
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
         <div className="flex items-center justify-between py-3">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFB81C] text-[15px] font-extrabold tracking-tight text-gray-900">
-              KB
-            </div>
+            <BrandLogo />
             <div className="leading-tight">
               <h1 className="text-[17px] font-extrabold tracking-tight text-gray-900">
                 KBCI 뉴스
