@@ -147,7 +147,8 @@ export default function ReadClient() {
         </div>
       ) : article?.ok && article.contentHtml ? (
         <>
-          {leadImage && (
+          {/* 본문에 이미지가 없을 때만 대표 이미지를 보여줘 중복 노출을 막는다 */}
+          {leadImage && !/<img/i.test(article.contentHtml) && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={leadImage}
