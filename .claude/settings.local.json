@@ -10,7 +10,9 @@
       "Bash(rmdir /tmp/kbci-news-tmp)",
       "Bash(setopt dotglob *)",
       "Bash(npm run *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "mcp__355ad8c4-624e-4a25-a68d-33b23d346064__list_tables",
+      "mcp__355ad8c4-624e-4a25-a68d-33b23d346064__apply_migration"
     ]
   }
 }
