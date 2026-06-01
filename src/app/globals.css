@@ -14,7 +14,8 @@
 html {
   /* 고령 사용자 가독성을 위해 기본 폰트 크기를 키운다 */
   font-size: 17px;
-  -webkit-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%; /* 모바일에서 글자 크기 자동 확대 방지 */
+  overflow-x: hidden; /* 가로 오버플로로 인한 레이아웃 깨짐 방지 */
 }
 
 body {
@@ -25,6 +26,9 @@ body {
     "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
   line-height: 1.6;
   word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
+  overflow-x: hidden;
+  /* 더블탭 확대로 인한 의도치 않은 줌/레이아웃 틀어짐 방지 (핀치 줌은 유지) */
+  touch-action: manipulation;
 }
 
 @layer components {
@@ -72,12 +76,20 @@ body {
   line-height: 1.35;
   color: #111;
 }
+.article-body {
+  overflow-wrap: break-word;
+}
 .article-body img {
   display: block;
-  width: 100%;
+  max-width: 100%;
   height: auto;
   margin: 1.4em auto;
   border-radius: 10px;
+}
+.article-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 .article-body figure {
   margin: 1.4em 0;

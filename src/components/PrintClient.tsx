@@ -55,13 +55,16 @@ export default function PrintClient() {
         const byLink = new Map(allMeta.map((it) => [it.link, it]));
         // 각 기사 본문을 병렬로 추출
         const articles = await Promise.all(
-          wanted.map((link) =>
-            fetch(`/api/article?url=${encodeURIComponent(link)}`, {
+          wanted.map((link) => {
+            const qs = new URLSearchParams({ url: link });
+            const orig = byLink.get(link)?.originallink;
+            if (orig && orig !== link) qs.set("fallback", orig);
+            return fetch(`/api/article?${qs.toString()}`, {
               signal: controller.signal,
             })
               .then((r) => r.json() as Promise<ArticleContent>)
-              .catch(() => null),
-          ),
+              .catch(() => null);
+          }),
         );
         const result: PrintItem[] = wanted.map((link, i) => ({
           link,

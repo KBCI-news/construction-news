@@ -13,6 +13,7 @@ import { readerHref } from "@/lib/links";
 import {
   byDate,
   byRelevance,
+  clusterArticles,
   countKeywords,
   dedupeArticles,
   hostOf,
@@ -112,7 +113,8 @@ export default function NewsList() {
 
   const allItems = useMemo<EnrichedNewsItem[]>(() => {
     if (data?.mode !== "all") return [];
-    return dedupeArticles(data.items as Article[]) as EnrichedNewsItem[];
+    const deduped = dedupeArticles(data.items as Article[]);
+    return clusterArticles(deduped) as EnrichedNewsItem[];
   }, [data]);
 
   const featured = useMemo(

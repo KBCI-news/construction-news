@@ -29,24 +29,31 @@ export default function ReadClient() {
     const controller = new AbortController();
     setLoading(true);
     setArticle(null);
+    setMeta(null);
 
-    // 본문 추출 + DB 메타데이터(카테고리/날짜)를 함께 가져온다.
-    Promise.all([
-      fetch(`/api/article?url=${encodeURIComponent(url)}`, {
+    (async () => {
+      // 1) 메타데이터(카테고리/날짜/원문링크) 먼저 — 헤더 즉시 표시 + 폴백 URL 확보
+      const items = await fetch("/api/news", { signal: controller.signal })
+        .then((r) => r.json())
+        .then((j) => (j.items ?? []) as NewsResponseItem[])
+        .catch(() => [] as NewsResponseItem[]);
+      const found = items.find((it) => it.link === url) ?? null;
+      setMeta(found);
+
+      // 2) 본문 추출 — 실패 시 원문(언론사) 링크로 재시도
+      const qs = new URLSearchParams({ url });
+      if (found?.originallink && found.originallink !== url) {
+        qs.set("fallback", found.originallink);
+      }
+      const art = await fetch(`/api/article?${qs.toString()}`, {
         signal: controller.signal,
       })
         .then((r) => r.json() as Promise<ArticleContent>)
-        .catch(() => null),
-      fetch("/api/news", { signal: controller.signal })
-        .then((r) => r.json())
-        .then((j) => (j.items ?? []) as NewsResponseItem[])
-        .catch(() => [] as NewsResponseItem[]),
-    ])
-      .then(([art, items]) => {
-        setArticle(art);
-        setMeta(items.find((it) => it.link === url) ?? null);
-      })
-      .finally(() => setLoading(false));
+        .catch(() => null);
+      setArticle(art);
+    })().finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
 
     return () => controller.abort();
   }, [url]);
