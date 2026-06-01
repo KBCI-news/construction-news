@@ -416,7 +416,7 @@ function HeroSection({
         }
       >
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="inline-flex border border-gray-300 text-[13px]">
+          <div className="inline-flex overflow-hidden rounded-lg border border-gray-300 text-[13px]">
             <button
               onClick={() => onRangeChange("daily")}
               className={`px-3 py-1.5 font-bold tracking-wider transition-colors ${
@@ -442,12 +442,12 @@ function HeroSection({
             <PrintLink
               links={allLinks}
               label="전체 출력"
-              className="no-print inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+              className="no-print inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
             />
           )}
           <Link
             href="/featured"
-            className="border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
             + 더보기
           </Link>
@@ -462,7 +462,7 @@ function HeroSection({
         />
       ) : (
         <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             <a href={readerHref(main.link)} className="group block">
               <Thumbnail
                 src={main.imageUrl}
@@ -530,7 +530,7 @@ function HeroSection({
             )}
           </div>
 
-          <aside>
+          <aside className="min-w-0">
             <div className="border-b border-gray-200 pb-2">
               <h3 className="text-[13px] font-bold tracking-widest text-gray-900">
                 핫뉴스 TOP 5
@@ -622,7 +622,7 @@ function LegalSection({
 function HeroSkeleton() {
   return (
     <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
-      <div className="lg:col-span-2">
+      <div className="min-w-0 lg:col-span-2">
         <div className="aspect-[16/9] w-full animate-pulse rounded-xl bg-gray-200" />
         <div className="mt-4 h-7 w-3/4 animate-pulse rounded bg-gray-200" />
         <div className="mt-2 h-7 w-1/2 animate-pulse rounded bg-gray-200" />

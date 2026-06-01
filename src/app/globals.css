@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --background: #f4f5f7;
-  --foreground: #18181b;
+  --background: #f3f4f7;
+  --foreground: #16161a;
   --surface: #ffffff;
-  --line: #e6e7ea;
+  --line: #e9eaee;
   --kb: #ffb81c;
   --kb-ink: #8a6d10;
 }
@@ -20,24 +20,31 @@ html {
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  /* 은은한 세로 그라데이션 배경으로 깊이감 부여 */
+  background: linear-gradient(180deg, #f6f7f9 0%, #eef0f4 100%);
+  background-attachment: fixed;
   font-family:
     "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
   line-height: 1.6;
+  letter-spacing: -0.01em;
   word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   /* 더블탭 확대로 인한 의도치 않은 줌/레이아웃 틀어짐 방지 (핀치 줌은 유지) */
   touch-action: manipulation;
 }
 
 @layer components {
-  /* 대시보드 패널 표면 */
+  /* 대시보드 패널 표면 — 레이어드 소프트 섀도로 프리미엄 깊이감 */
   .card {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 16px;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 2px rgba(16, 24, 40, 0.04),
+      0 8px 20px -12px rgba(16, 24, 40, 0.08);
   }
   /* 섹션 제목 앞 KB 옐로우 액센트 바 */
   .accent-bar::before {
