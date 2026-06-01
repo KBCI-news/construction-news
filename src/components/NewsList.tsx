@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 import type { TrendingResponse } from "@/app/api/trending/route";
@@ -49,11 +50,20 @@ export default function NewsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  // 검색어는 URL 쿼리(?q=)로 관리 — 로고(홈)·뒤로가기로 자연스럽게 해제된다.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("q");
+
+  const [searchInput, setSearchInput] = useState(searchQuery ?? "");
   const [trending, setTrending] = useState<TrendingResponse["searches"]>([]);
 
   const [featuredRange, setFeaturedRange] = useState<TimeRange>("daily");
+
+  // URL의 q가 바뀌면(검색/해제/뒤로가기) 입력창도 동기화
+  useEffect(() => {
+    setSearchInput(searchQuery ?? "");
+  }, [searchQuery]);
 
   useEffect(() => {
     fetch("/api/trending")
@@ -149,8 +159,8 @@ export default function NewsList() {
     const trimmed = q.trim();
     if (!trimmed) return;
     setSearchInput(trimmed);
-    setSearchQuery(trimmed);
     logSearch(trimmed);
+    router.push(`/?q=${encodeURIComponent(trimmed)}`);
   };
 
   const onSubmitSearch = (e: React.FormEvent) => {
@@ -159,8 +169,7 @@ export default function NewsList() {
   };
 
   const clearSearch = () => {
-    setSearchInput("");
-    setSearchQuery(null);
+    router.push("/");
   };
 
   return (
