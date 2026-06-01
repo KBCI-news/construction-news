@@ -499,7 +499,7 @@ function HeroSection({
                     <li key={item.link}>
                       <a
                         href={readerHref(item.link)}
-                        className="group flex items-start gap-4 py-4 transition-colors hover:bg-gray-50/40"
+                        className="group flex items-start gap-3 overflow-hidden py-4 transition-colors hover:bg-gray-50/40"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[17px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
@@ -520,7 +520,7 @@ function HeroSection({
                               ? labelOf(item.categories[0])
                               : "KBCI"
                           }
-                          className="h-[64px] w-[92px] shrink-0 rounded-lg"
+                          className="h-[60px] w-[84px] shrink-0 rounded-lg"
                         />
                       </a>
                     </li>
@@ -694,7 +694,7 @@ function CategoryHighlights({
                     <li key={item.link}>
                       <a
                         href={readerHref(item.link)}
-                        className="group flex items-start gap-3 py-3 transition-colors hover:bg-gray-50/40"
+                        className="group flex items-start gap-3 overflow-hidden py-3 transition-colors hover:bg-gray-50/40"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="line-clamp-2 text-[15.5px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline">
@@ -708,7 +708,7 @@ function CategoryHighlights({
                         <Thumbnail
                           src={item.imageUrl}
                           label={cat.label}
-                          className="h-[52px] w-[72px] shrink-0 rounded-md"
+                          className="h-[48px] w-[64px] shrink-0 rounded-md"
                         />
                       </a>
                     </li>
