@@ -67,10 +67,10 @@ export default function FeaturedListClient() {
             <PrintLink
               links={featured.map((it) => it.link)}
               label="전체 출력"
-              className="no-print inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+              className="no-print inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
             />
           )}
-          <div className="inline-flex border border-gray-300 text-[13px]">
+          <div className="inline-flex overflow-hidden rounded-lg border border-gray-300 text-[13px]">
             <button
               onClick={() => setRange("daily")}
               className={`px-4 py-1.5 font-bold tracking-wider transition-colors ${

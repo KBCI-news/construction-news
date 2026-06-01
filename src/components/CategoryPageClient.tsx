@@ -105,7 +105,7 @@ export default function CategoryPageClient({
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           {loading ? (
             <div className="card p-5 sm:p-7">
               <SkeletonList />
@@ -135,7 +135,7 @@ export default function CategoryPageClient({
           )}
         </div>
 
-        <aside>
+        <aside className="min-w-0">
           <div className="card p-5 sm:p-6 lg:sticky lg:top-[120px]">
             <h2 className="accent-bar mb-4 flex items-center text-[13px] font-bold tracking-widest text-gray-900">
               주요 뉴스 TOP 5
