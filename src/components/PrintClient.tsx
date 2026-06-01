@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { NewsResponseItem } from "@/app/api/news/route";
 import type { ArticleContent } from "@/app/api/article/route";
@@ -78,6 +78,15 @@ export default function PrintClient() {
     return () => controller.abort();
   }, [wanted]);
 
+  // 데이터(본문 포함) 로드가 끝나면 인쇄 팝업을 자동으로 띄운다.
+  const printedRef = useRef(false);
+  useEffect(() => {
+    if (loading || items.length === 0 || printedRef.current) return;
+    printedRef.current = true;
+    const t = setTimeout(() => window.print(), 500);
+    return () => clearTimeout(t);
+  }, [loading, items]);
+
   if (loading) {
     return (
       <div className="py-20 text-center text-sm text-gray-500">
@@ -122,7 +131,8 @@ export default function PrintClient() {
           const categories = meta?.categories ?? [];
           const leadImage = article?.leadImage || meta?.imageUrl || null;
           const host = article?.host || hostOf(link);
-          const hasBody = article?.ok && article.contentHtml;
+          const hasBody = Boolean(article?.ok && article.contentHtml);
+          const bodyHasImg = hasBody && /<img/i.test(article!.contentHtml!);
 
           return (
             <article key={link} className="print-article">
@@ -139,7 +149,7 @@ export default function PrintClient() {
                 {meta?.pubDate && ` · ${formatDate(meta.pubDate)}`}
               </p>
 
-              {leadImage && (
+              {leadImage && !bodyHasImg && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={leadImage}

@@ -773,7 +773,7 @@ function SectionHeader({
           </p>
         )}
       </div>
-      {children && <div className="shrink-0">{children}</div>}
+      {children && <div className="w-full sm:w-auto sm:shrink-0">{children}</div>}
     </div>
   );
 }

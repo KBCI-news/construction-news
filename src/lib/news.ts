@@ -62,22 +62,27 @@ export const byDate = (a: Article, b: Article): number =>
 // 여러 매체가 같은 사안을 각자 다른 제목으로 보도해 생기는 "유사 중복"을 묶는다.
 // 제목의 의미 토큰(2자 이상)을 비교해, 같은 날 + 공통 토큰 3개 이상 + 자카드 0.3 이상이면
 // 같은 사안으로 보고 한 건만 남긴다.
-const CLUSTER_STOP = new Set([
-  "위한", "통해", "대한", "관련", "이벤트", "행사", "나서", "출시", "오늘",
-  "최대", "우리", "지난", "올해", "추진", "확대", "강화", "예정", "발표",
-]);
+const SIM_THRESHOLD = 0.35;
 
-function meaningfulTokens(title: string): string[] {
-  return Array.from(
-    new Set(
-      stripHtml(title)
-        .replace(/\[[^\]]*\]/g, "")
-        .replace(/\([^)]*\)/g, "")
-        .split(/[^\p{L}\p{N}]+/u)
-        .map((t) => t.trim())
-        .filter((t) => t.length >= 2 && !CLUSTER_STOP.has(t)),
-    ),
-  );
+// 제목을 글자 단위 bigram 집합으로 만든다. 단어 토큰 방식과 달리 한국어 형태
+// 변형(봉사/봉사활동, 15년째/14년째 등)에도 유사도가 견고하게 잡힌다.
+function titleBigrams(title: string): Set<string> {
+  const s = stripHtml(title)
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
+  const set = new Set<string>();
+  for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+  return set;
+}
+
+function diceSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  const [small, large] = a.size < b.size ? [a, b] : [b, a];
+  let inter = 0;
+  for (const x of small) if (large.has(x)) inter++;
+  return (2 * inter) / (a.size + b.size);
 }
 
 function dayKey(pubDate: string): string {
@@ -104,7 +109,7 @@ export function clusterArticles(items: Article[]): Article[] {
     if (ra !== rb) parent[ra] = rb;
   };
 
-  const tokens = items.map((it) => meaningfulTokens(it.title));
+  const grams = items.map((it) => titleBigrams(it.title));
 
   // 같은 날짜끼리만 비교 (성능 + 오병합 방지)
   const buckets = new Map<string, number[]>();
@@ -120,15 +125,9 @@ export function clusterArticles(items: Article[]): Article[] {
       for (let b = a + 1; b < idxs.length; b++) {
         const i = idxs[a];
         const j = idxs[b];
-        const ti = tokens[i];
-        const tj = tokens[j];
-        if (ti.length < 3 || tj.length < 3) continue;
-        const setj = new Set(tj);
-        let shared = 0;
-        for (const t of ti) if (setj.has(t)) shared++;
-        if (shared < 3) continue;
-        const jaccard = shared / (ti.length + tj.length - shared);
-        if (jaccard >= 0.3) union(i, j);
+        // 너무 짧은 제목은 비교 제외 (불안정)
+        if (grams[i].size < 6 || grams[j].size < 6) continue;
+        if (diceSimilarity(grams[i], grams[j]) >= SIM_THRESHOLD) union(i, j);
       }
     }
   }

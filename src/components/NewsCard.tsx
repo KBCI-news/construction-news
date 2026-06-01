@@ -24,8 +24,8 @@ export function NewsCard({ item }: { item: NewsCardItem }) {
   const summary = item.description ? stripHtml(item.description) : "";
 
   return (
-    <article className="group flex items-start gap-4 py-5 sm:gap-6 sm:py-7">
-      <div className="min-w-0 flex-1">
+    <article className="group flex items-start gap-3 overflow-hidden py-5 sm:gap-6 sm:py-7">
+      <div className="min-w-0 flex-1 break-words">
         {categories.length > 0 && (
           <div className="mb-2 flex flex-wrap items-center gap-x-1.5 text-[12px] font-bold tracking-wider text-[#9A7A12]">
             {categories.map((id, i) => (
@@ -69,7 +69,7 @@ export function NewsCard({ item }: { item: NewsCardItem }) {
         <Thumbnail
           src={item.imageUrl}
           label={placeholderLabel}
-          className="h-[72px] w-[104px] rounded-lg sm:h-[108px] sm:w-[168px]"
+          className="h-[68px] w-[96px] rounded-lg sm:h-[108px] sm:w-[168px]"
         />
       </Link>
     </article>

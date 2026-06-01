@@ -89,6 +89,44 @@ function absolutize(src: string, base: string): string | null {
   }
 }
 
+// 본문 끝에 붙는 기자 바이라인·저작권·홍보(구독/공유) 문구를 제거한다.
+const COPY_RE =
+  /(무단\s*전재|재배포\s*금지|저작권자|ⓒ|©|copyright|all rights reserved)/i;
+const PROMO_RE =
+  /(구독하기|네이버에서.*구독|카카오톡|페이스북|트위터|기사\s*제보|제보하기|앱\s*다운|뉴스레터|좋아요|공유하기|기사 추천)/;
+const EMAIL_RE = /[\w.+-]+@[\w.-]+\.\w{2,}/;
+const BYLINE_RE = /^[[(<【]?\s*[가-힣]{2,4}\s*(기자|특파원|논설위원|편집위원|인턴기자)\b/;
+const SENTENCE_END_RE = /[다요음함됨임죠죵]\.?$/; // 본문 문장은 보통 이렇게 끝남
+
+function isJunk(text: string): boolean {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  if (COPY_RE.test(t) && t.length < 200) return true;
+  if (t.length <= 60 && PROMO_RE.test(t)) return true;
+  // 바이라인: "이종용 기자", "홍길동 기자 hong@x.com" 등 (문장형은 제외)
+  if (t.length <= 35 && BYLINE_RE.test(t) && !SENTENCE_END_RE.test(t)) return true;
+  // 이메일만 있는 짧은 줄
+  if (t.length <= 40 && EMAIL_RE.test(t) && !SENTENCE_END_RE.test(t)) return true;
+  return false;
+}
+
+function cleanContent(html: string): string {
+  const { document } = parseHTML(`<div id="__root">${html}</div>`);
+  const root = document.getElementById("__root");
+  if (!root) return html;
+  // 다른 블록/미디어를 품지 않은 '잎' 요소만 검사해 컨테이너 통째 삭제를 방지
+  const candidates = Array.from(
+    root.querySelectorAll("p, span, div, figcaption, em, small, a, h4, h5, h6"),
+  );
+  for (const el of candidates) {
+    if (el.querySelector("p, div, ul, ol, table, img, figure, blockquote")) {
+      continue;
+    }
+    if (isJunk(el.textContent ?? "")) el.remove();
+  }
+  return root.innerHTML;
+}
+
 // 단일 URL에서 본문을 가져와 추출한다. 실패 시 null.
 async function extract(target: string): Promise<ArticleContent | null> {
   let host: string | null = null;
@@ -153,7 +191,7 @@ async function extract(target: string): Promise<ArticleContent | null> {
     title = title || metaContent(document, "og:title") || document.title || null;
 
     if (!contentHtml) return null;
-    const clean = sanitizeHtml(contentHtml, ALLOWED).trim();
+    const clean = sanitizeHtml(cleanContent(contentHtml), ALLOWED).trim();
     if (!clean) return null;
 
     return {
