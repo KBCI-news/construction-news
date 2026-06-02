@@ -2,6 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* KB금융 전용 웹폰트 — 한 패밀리(KBFG)로 굵기별 매핑
+   본문(Text) + 큰 헤드라인(Display)을 weight 범위로 자동 전환 */
+@font-face {
+  font-family: "KBFG";
+  src: url("/fonts/KBfgTextL.woff2") format("woff2");
+  font-weight: 100 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "KBFG";
+  src: url("/fonts/KBfgTextM.woff2") format("woff2");
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "KBFG";
+  src: url("/fonts/KBfgTextB.woff2") format("woff2");
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "KBFG";
+  src: url("/fonts/KBfgDisplayEB.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "KBFG";
+  src: url("/fonts/KBfgDisplayH.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #f3f4f7;
   --foreground: #16161a;
@@ -24,8 +62,8 @@ body {
   background: linear-gradient(180deg, #f6f7f9 0%, #eef0f4 100%);
   background-attachment: fixed;
   font-family:
-    "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-    "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
+    "KBFG", "Pretendard", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", Arial, sans-serif;
   line-height: 1.6;
   letter-spacing: -0.01em;
   word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
