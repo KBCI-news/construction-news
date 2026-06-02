@@ -164,6 +164,35 @@ body {
   margin: 0.3em 0;
 }
 
+/* 리더 첫 문단 드롭캡 — 에디토리얼 감성 */
+.article-body > p:first-of-type::first-letter {
+  float: left;
+  margin: 0.02em 0.08em 0 0;
+  font-size: 3.1em;
+  font-weight: 800;
+  line-height: 0.86;
+  color: #111;
+}
+
+/* 프리미엄 디테일 */
+::selection {
+  background: rgba(255, 184, 28, 0.28);
+}
+a,
+button {
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+/* 스크롤 시 sticky 헤더 가독성 위해 부드러운 포커스 링 */
+:focus-visible {
+  outline: 2px solid rgba(255, 184, 28, 0.6);
+  outline-offset: 2px;
+}
+
 /* 인쇄 / PDF 저장 시 화면 전용 요소 숨김 */
 @media print {
   .no-print {

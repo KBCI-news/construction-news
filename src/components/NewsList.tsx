@@ -463,32 +463,33 @@ function HeroSection({
       ) : (
         <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
           <div className="min-w-0 lg:col-span-2">
-            <a href={readerHref(main.link)} className="group block">
+            <a
+              href={readerHref(main.link)}
+              className="group relative block aspect-[4/3] overflow-hidden rounded-2xl sm:aspect-[16/10]"
+            >
               <Thumbnail
                 src={main.imageUrl}
                 label={main.categories[0] ? labelOf(main.categories[0]) : "KBCI"}
-                className="aspect-[16/9] w-full rounded-xl"
+                className="absolute inset-0 h-full w-full"
               />
-              {main.categories.length > 0 && (
-                <div className="mb-2 mt-4 text-[12px] font-bold tracking-wider text-[#9A7A12]">
-                  {main.categories.map((id) => labelOf(id)).join(" · ")}
-                </div>
-              )}
-              <h3 className="text-[26px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[34px]">
-                {stripHtml(main.title)}
-              </h3>
-              {main.description && (
-                <p className="mt-3 line-clamp-2 text-[15px] leading-relaxed text-gray-600 sm:text-[16px]">
-                  {stripHtml(main.description)}
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
+                {main.categories.length > 0 && (
+                  <div className="mb-2 text-[12px] font-bold tracking-widest text-[#FFD37A]">
+                    {main.categories.map((id) => labelOf(id)).join(" · ")}
+                  </div>
+                )}
+                <h3 className="line-clamp-3 text-[23px] font-extrabold leading-[1.18] tracking-tight text-white drop-shadow-sm sm:text-[32px]">
+                  {stripHtml(main.title)}
+                </h3>
+                <p className="mt-2.5 text-[12.5px] text-white/75">
+                  <span className="font-semibold text-white/90">
+                    {hostOf(main.originallink)}
+                  </span>
+                  <span className="mx-1.5">—</span>
+                  <span>{formatRelative(main.pubDate)}</span>
                 </p>
-              )}
-              <p className="mt-3 text-[13px] text-gray-500">
-                <span className="font-medium text-gray-700">
-                  {hostOf(main.originallink)}
-                </span>
-                <span className="mx-1.5">—</span>
-                <span>{formatRelative(main.pubDate)}</span>
-              </p>
+              </div>
             </a>
 
             {subStories.length > 0 && (
@@ -801,8 +802,8 @@ function StatRow({
               →
             </span>
           </div>
-          <div className="mt-1.5 flex items-baseline gap-1">
-            <span className="text-[22px] font-extrabold tabular-nums tracking-tight text-gray-900">
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-[26px] font-extrabold tabular-nums tracking-tight text-gray-900 transition-colors group-hover:text-[#9A7A12]">
               {loading ? "–" : (counts[cat.id] ?? 0).toLocaleString()}
             </span>
             <span className="text-[11px] font-medium text-gray-400">건</span>
