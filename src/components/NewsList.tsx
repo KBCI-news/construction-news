@@ -18,6 +18,7 @@ import {
   dedupeArticles,
   hostOf,
   isLegalArticle,
+  primaryCategory,
   stripHtml,
   type Article,
 } from "@/lib/news";
@@ -136,7 +137,7 @@ export default function NewsList() {
     const map: Record<string, EnrichedNewsItem[]> = {};
     for (const cat of CATEGORIES) {
       map[cat.id] = allItems
-        .filter((it) => it.categories.includes(cat.id))
+        .filter((it) => primaryCategory(it) === cat.id)
         .slice(0, 4);
     }
     return map;
@@ -145,8 +146,8 @@ export default function NewsList() {
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const cat of CATEGORIES) {
-      c[cat.id] = allItems.filter((it) =>
-        it.categories.includes(cat.id),
+      c[cat.id] = allItems.filter(
+        (it) => primaryCategory(it) === cat.id,
       ).length;
     }
     return c;
@@ -474,9 +475,9 @@ function HeroSection({
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
-                {main.categories.length > 0 && (
+                {primaryCategory(main) && (
                   <div className="mb-2 text-[12px] font-bold tracking-widest text-[#FFD37A]">
-                    {main.categories.map((id) => labelOf(id)).join(" · ")}
+                    {labelOf(primaryCategory(main)!)}
                   </div>
                 )}
                 <h3 className="line-clamp-3 text-[23px] font-extrabold leading-[1.18] tracking-tight text-white drop-shadow-sm sm:text-[32px]">

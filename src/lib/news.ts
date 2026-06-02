@@ -1,6 +1,27 @@
 import { FEATURED_KEYWORDS, LEGAL_ACTION_KEYWORDS } from "@/lib/categories";
 import { hostOf, stripHtml } from "@/lib/format";
 
+// 한 기사가 여러 카테고리에 걸쳐 있어도 "대표 카테고리" 1개만 정해
+// 카테고리 페이지/뱃지/집계에 일관 적용한다. (탭을 옮겨도 같은 기사 중복 노출 방지)
+// 앞에 올수록 우선순위가 높다 — GNB 순서를 따른다.
+const CATEGORY_PRIORITY = [
+  "finance",
+  "economy",
+  "industry",
+  "society",
+  "law",
+  "it",
+];
+
+export function primaryCategory(item: {
+  categories: string[];
+}): string | undefined {
+  for (const id of CATEGORY_PRIORITY) {
+    if (item.categories.includes(id)) return id;
+  }
+  return item.categories[0];
+}
+
 export type Article = {
   link: string;
   originallink: string;
