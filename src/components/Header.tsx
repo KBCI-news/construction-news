@@ -38,7 +38,8 @@ export function Header() {
   ];
 
   return (
-    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/90 backdrop-blur">
+    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/85 shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)] backdrop-blur-md">
+      <div className="h-[3px] w-full bg-gradient-to-r from-[#FFB81C] to-[#FFD37A]" />
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
         <div className="flex items-center justify-between py-3">
           <Link href="/" className="flex items-center gap-2.5">
