@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CATEGORIES } from "@/lib/categories";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
 import { readerHref } from "@/lib/links";
+import { primaryCategory } from "@/lib/news";
 import { Thumbnail } from "@/components/Thumbnail";
 import { PrintLink } from "@/components/PrintLink";
 
@@ -20,22 +21,16 @@ export type NewsCardItem = {
 
 export function NewsCard({ item }: { item: NewsCardItem }) {
   const categories = item.categories ?? [];
-  const placeholderLabel = categories[0] ? labelOf(categories[0]) : "KBCI";
+  const primary = primaryCategory({ categories });
+  const placeholderLabel = primary ? labelOf(primary) : "KBCI";
   const summary = item.description ? stripHtml(item.description) : "";
 
   return (
     <article className="group flex items-start gap-3 overflow-hidden rounded-lg py-5 transition-colors hover:bg-gray-50/60 sm:gap-6 sm:py-7">
       <div className="min-w-0 flex-1 break-words">
-        {categories.length > 0 && (
-          <div className="mb-2 flex flex-wrap items-center gap-x-1.5 text-[12px] font-bold tracking-wider text-[#9A7A12]">
-            {categories.map((id, i) => (
-              <span key={id} className="flex items-center gap-1.5">
-                <span>{labelOf(id)}</span>
-                {i < categories.length - 1 && (
-                  <span className="text-gray-300">·</span>
-                )}
-              </span>
-            ))}
+        {primary && (
+          <div className="mb-2 text-[12px] font-bold tracking-wider text-[#9A7A12]">
+            {labelOf(primary)}
           </div>
         )}
         <Link href={readerHref(item.link)} className="block">

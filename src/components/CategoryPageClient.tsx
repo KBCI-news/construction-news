@@ -10,6 +10,7 @@ import {
   clusterArticles,
   dedupeArticles,
   hostOf,
+  primaryCategory,
   stripHtml,
   type Article,
 } from "@/lib/news";
@@ -59,7 +60,7 @@ export default function CategoryPageClient({
   const categoryItems = useMemo(
     () =>
       dedupedAll
-        .filter((it) => it.categories.includes(categoryId))
+        .filter((it) => primaryCategory(it) === categoryId)
         .sort(byRelevance),
     [dedupedAll, categoryId],
   );
@@ -191,9 +192,9 @@ function HeroArticle({ item }: { item: NewsResponseItem }) {
         label={item.categories[0] ? labelOf(item.categories[0]) : "KBCI"}
         className="aspect-[16/9] w-full rounded-xl"
       />
-      {item.categories.length > 0 && (
+      {primaryCategory(item) && (
         <div className="mb-2 mt-4 text-[12px] font-bold tracking-wider text-[#9A7A12]">
-          {item.categories.map((id) => labelOf(id)).join(" · ")}
+          {labelOf(primaryCategory(item)!)}
         </div>
       )}
       <h2 className="text-[24px] font-extrabold leading-tight tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[30px]">
