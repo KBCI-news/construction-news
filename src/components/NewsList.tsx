@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { NewsResponseItem } from "@/app/api/news/route";
@@ -265,6 +265,23 @@ function SearchPanel({
   hotKeywords: { keyword: string; count: number }[];
 }) {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // "/" 단축키로 검색창 포커스 (입력 중이 아닐 때만)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (el as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const handlePick = (q: string) => {
     onPick(q);
@@ -302,11 +319,13 @@ function SearchPanel({
           />
         </svg>
         <input
+          ref={inputRef}
           type="search"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
-          placeholder="키워드를 입력해 검색하세요"
+          aria-label="뉴스 검색"
+          placeholder="키워드를 입력해 검색하세요  ( / )"
           className="w-full bg-transparent py-3 pl-9 pr-16 text-[16px] font-semibold text-gray-900 outline-none placeholder:font-normal placeholder:text-gray-400 sm:text-[17px]"
         />
         <button
@@ -725,6 +744,8 @@ function CategoryHighlights({
   );
 }
 
+const FEED_PAGE = 20;
+
 function FullFeed({
   items,
   loading,
@@ -732,11 +753,21 @@ function FullFeed({
   items: AnyItem[];
   loading: boolean;
 }) {
+  const [visible, setVisible] = useState(FEED_PAGE);
+
+  // 목록(검색/필터)이 바뀌면 다시 처음부터 보여준다.
+  useEffect(() => {
+    setVisible(FEED_PAGE);
+  }, [items]);
+
+  const shown = items.slice(0, visible);
+  const remaining = items.length - shown.length;
+
   return (
     <section className="card scroll-mt-32 p-5 sm:p-7">
       <SectionHeader
         title="최신 뉴스"
-        subtitle={`관련도 높은 순 · 총 ${items.length}건`}
+        subtitle={`관련도 높은 순 · 총 ${items.length.toLocaleString()}건`}
       />
 
       {loading ? (
@@ -744,11 +775,27 @@ function FullFeed({
       ) : items.length === 0 ? (
         <EmptyState message="표시할 뉴스가 없습니다." />
       ) : (
-        <div className="divide-y divide-gray-200">
-          {items.map((item) => (
-            <NewsCard key={item.link} item={item} />
-          ))}
-        </div>
+        <>
+          <div className="divide-y divide-gray-200">
+            {shown.map((item) => (
+              <NewsCard key={item.link} item={item} />
+            ))}
+          </div>
+          {remaining > 0 && (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setVisible((v) => v + FEED_PAGE)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-6 py-2.5 text-[14px] font-bold tracking-wide text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+              >
+                더 보기
+                <span className="text-[12px] font-medium text-gray-400">
+                  +{Math.min(FEED_PAGE, remaining)}
+                </span>
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );

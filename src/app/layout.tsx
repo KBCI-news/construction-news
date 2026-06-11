@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Header } from "@/components/Header";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -35,12 +36,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <main className="min-h-screen">
-          <Header />
-          <div className="mx-auto max-w-[1280px] overflow-x-hidden px-4 py-7 sm:px-8 sm:py-10">
-            {children}
-          </div>
+        <a href="#main-content" className="skip-link">
+          본문 바로가기
+        </a>
+        <Header />
+        <main
+          id="main-content"
+          className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-4 py-7 sm:px-8 sm:py-10"
+        >
+          {children}
         </main>
+        <ScrollToTop />
       </body>
     </html>
   );

@@ -54,6 +54,37 @@ html {
   font-size: 17px;
   -webkit-text-size-adjust: 100%; /* 모바일에서 글자 크기 자동 확대 방지 */
   overflow-x: hidden; /* 가로 오버플로로 인한 레이아웃 깨짐 방지 */
+  scroll-behavior: smooth;
+}
+
+/* 본문 바로가기(skip link) — 키보드 접근성 */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: #111;
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 10px 0;
+  font-weight: 700;
+}
+.skip-link:focus {
+  left: 0;
+}
+
+/* 모션 최소화 설정 존중 (전정기관 민감 사용자 등) */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 body {
