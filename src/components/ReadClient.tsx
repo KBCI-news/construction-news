@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ArticleContent } from "@/app/api/article/route";
 import type { NewsResponseItem } from "@/app/api/news/route";
@@ -18,6 +18,59 @@ export default function ReadClient() {
   const [article, setArticle] = useState<ArticleContent | null>(null);
   const [meta, setMeta] = useState<NewsResponseItem | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [fontScale, setFontScale] = useState(1);
+  const [progress, setProgress] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // 글자 크기 설정 복원 (고령 사용자 가독성)
+  useEffect(() => {
+    const s = Number(localStorage.getItem("reader-font-scale"));
+    if (s >= 0.85 && s <= 1.6) setFontScale(s);
+  }, []);
+
+  const changeScale = (delta: number) =>
+    setFontScale((s) => {
+      const n = Math.min(1.6, Math.max(0.85, Number((s + delta).toFixed(2))));
+      localStorage.setItem("reader-font-scale", String(n));
+      return n;
+    });
+
+  // 읽기 진행률
+  useEffect(() => {
+    const onScroll = () => {
+      const el = bodyRef.current;
+      if (!el) return setProgress(0);
+      const seen = window.scrollY + window.innerHeight - el.offsetTop;
+      setProgress(Math.max(0, Math.min(1, seen / el.offsetHeight)));
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [article]);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const readMinutes = useMemo(() => {
+    const text = article?.contentHtml
+      ? stripHtml(article.contentHtml)
+      : (meta?.description ?? "");
+    const chars = text.replace(/\s/g, "").length;
+    return Math.max(1, Math.round(chars / 500));
+  }, [article, meta]);
 
   useEffect(() => {
     if (!url) {
@@ -75,28 +128,61 @@ export default function ReadClient() {
 
   return (
     <article className="mx-auto max-w-[760px]">
+      {/* 읽기 진행바 */}
+      <div
+        className="no-print fixed inset-x-0 top-0 z-50 h-[3px] bg-[#FFB81C] transition-[width] duration-100"
+        style={{ width: `${progress * 100}%` }}
+        aria-hidden
+      />
+
       {/* 상단 바 (인쇄 시 숨김) */}
-      <div className="no-print mb-6 flex items-center justify-between">
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => router.back()}
           className="inline-flex items-center gap-1 text-[13px] font-bold tracking-wider text-gray-500 hover:text-[#9A7A12]"
         >
           ← 목록으로
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="inline-flex items-center overflow-hidden rounded-lg border border-gray-300"
+            role="group"
+            aria-label="글자 크기 조절"
+          >
+            <button
+              onClick={() => changeScale(-0.1)}
+              aria-label="글자 작게"
+              className="px-2.5 py-1.5 text-[13px] font-bold text-gray-600 hover:text-[#9A7A12]"
+            >
+              가−
+            </button>
+            <button
+              onClick={() => changeScale(0.1)}
+              aria-label="글자 크게"
+              className="border-l border-gray-300 px-2.5 py-1.5 text-[16px] font-bold text-gray-600 hover:text-[#9A7A12]"
+            >
+              가+
+            </button>
+          </div>
+          <button
+            onClick={copyLink}
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+          >
+            {copied ? "✓ 복사됨" : "🔗 링크"}
+          </button>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
-            🖨 PDF 출력
+            🖨 PDF
           </button>
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
-            원문 보기 ↗
+            원문 ↗
           </a>
         </div>
       </div>
@@ -128,6 +214,12 @@ export default function ReadClient() {
               <span>{formatRelative(meta.pubDate)}</span>
             </>
           )}
+          {article?.ok && (
+            <>
+              <span className="mx-1.5">·</span>
+              <span>읽는 시간 약 {readMinutes}분</span>
+            </>
+          )}
         </p>
       </header>
 
@@ -153,7 +245,9 @@ export default function ReadClient() {
             />
           )}
           <div
+            ref={bodyRef}
             className="article-body mt-7"
+            style={{ fontSize: `${(17 * fontScale).toFixed(1)}px` }}
             dangerouslySetInnerHTML={{ __html: article.contentHtml }}
           />
           <p className="no-print mt-10 border-t border-gray-200 pt-5 text-[13px] text-gray-400">

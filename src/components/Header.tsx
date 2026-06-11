@@ -59,7 +59,10 @@ export function Header() {
           </span>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav
+          aria-label="카테고리"
+          className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {navItems.map((item) => {
             const active =
               item.href === "/"
@@ -69,6 +72,7 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
                   active
                     ? "text-gray-900"
