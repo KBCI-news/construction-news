@@ -302,21 +302,93 @@ export function searchRelevance(
   const desc = nfm(item.description ?? "");
 
   let r = 0;
-  if (title === q) r += 60; // 제목 전체가 질의어
-  else if (title.startsWith(q)) r += 45; // 제목 머리
-  else if (title.includes(q)) r += 35; // 제목 포함
-  if (desc.includes(q)) r += 12;
+  // --- 1) 구(phrase) 단위 일치 : 제목이 가장 강한 신호 ---
+  if (title === q) {
+    r = 100; // 제목 전체가 질의어
+  } else if (title.startsWith(q)) {
+    r = 86; // 제목 머리 — 기사의 주제일 확률이 높다
+  } else if (title.includes(q)) {
+    // 제목 안 위치가 앞일수록 주제에 가깝다 (최대 +10)
+    const pos = title.indexOf(q) / Math.max(1, title.length);
+    r = 68 + (1 - pos) * 10;
+  } else if (desc.includes(q)) {
+    r = 34; // 본문 요약에만 등장 — 스치듯 언급일 수 있다
+  }
 
-  // 다어절 질의는 토큰 커버리지도 본다
-  const tokens = query
-    .split(/\s+/)
-    .map(nfm)
-    .filter((x) => x.length >= 2);
+  // --- 2) 다어절 질의는 토큰 커버리지로 보강 ---
+  const tokens = Array.from(
+    new Set(
+      query
+        .split(/\s+/)
+        .map(nfm)
+        .filter((x) => x.length >= 2),
+    ),
+  );
   if (tokens.length > 1) {
     const inTitle = tokens.filter((tk) => title.includes(tk)).length;
     const inDesc = tokens.filter((tk) => desc.includes(tk)).length;
-    r += (inTitle / tokens.length) * 20;
-    r += (inDesc / tokens.length) * 6;
+    // 구 전체가 안 맞아도 토큰이 다 들어 있으면 관련도가 높다
+    r = Math.max(r, (inTitle / tokens.length) * 62 + (inDesc / tokens.length) * 18);
   }
-  return r;
+
+  // --- 3) 반복 언급 : 제목 2회 이상이면 확실히 그 주제다 (최대 +8) ---
+  if (r > 0) {
+    let occ = 0;
+    let from = 0;
+    for (;;) {
+      const i = title.indexOf(q, from);
+      if (i < 0) break;
+      occ += 1;
+      from = i + Math.max(1, q.length);
+    }
+    if (occ >= 2) r += 8;
+  }
+
+  return Math.min(100, r);
+}
+
+/**
+ * 검색 결과 최종 정렬 점수.
+ * 관련도를 주로 보되, 같은 정도로 관련된 기사들 사이에서는
+ * 중요도(등급) → 최신 순으로 위에 올린다.
+ */
+export function searchRank(
+  query: string,
+  item: {
+    title: string;
+    description?: string | null;
+    importance?: number | null;
+    urgent?: boolean;
+    matchedTerms?: string[];
+    pubDate?: string;
+    now?: number;
+  },
+): number {
+  const relevance = searchRelevance(query, item);
+  if (relevance === 0) return 0;
+
+  const importance = item.importance ?? 0;
+
+  // 질의어가 업권 사전 term과 정확히 일치하면(예: "채권추심") 해당 term이
+  // 태깅된 기사를 우대한다 — 표기 변형까지 포함해 잡아낸다.
+  const qn = nfm(query);
+  const termHit = (item.matchedTerms ?? []).some((t) => nfm(t) === qn);
+
+  // 최신성은 마지막 미세 조정 (최대 6점)
+  let recency = 0;
+  if (item.pubDate) {
+    const t = new Date(item.pubDate).getTime();
+    if (!Number.isNaN(t)) {
+      const hours = Math.max(0, ((item.now ?? Date.now()) - t) / 3_600_000);
+      recency = 6 * Math.exp(-hours / 168); // 1주 반감
+    }
+  }
+
+  return (
+    relevance * 0.68 +
+    importance * 0.26 +
+    (termHit ? 6 : 0) +
+    (item.urgent ? 4 : 0) +
+    recency
+  );
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, type ArticleRow } from "@/lib/supabase";
-import { searchRelevance } from "@/lib/scoring";
+import { searchRank } from "@/lib/scoring";
 import type { ImportanceTier } from "@/lib/lexicon";
 import type { ReasonTag } from "@/lib/scoring";
 
@@ -21,6 +21,7 @@ export type FeedItem = {
   kinds: string[];
   reasons: ReasonTag[];
   clusterHosts: number;
+  matchedTerms: string[];
 };
 
 export type FeedResponse = {
@@ -38,7 +39,7 @@ const RANGE_HOURS: Record<string, number> = {
 
 const SELECT =
   "link,original_link,title,description,pub_date,image_url,source_host," +
-  "importance,importance_tier,urgent,desks,kinds,reasons,cluster_hosts,is_rep";
+  "importance,importance_tier,urgent,desks,kinds,reasons,cluster_hosts,is_rep,matched_terms";
 
 type Row = Pick<
   ArticleRow,
@@ -52,6 +53,7 @@ type Row = Pick<
   reasons: ReasonTag[] | null;
   cluster_hosts: number | null;
   is_rep: boolean | null;
+  matched_terms: string[] | null;
 };
 
 const toItem = (r: Row): FeedItem => ({
@@ -69,6 +71,7 @@ const toItem = (r: Row): FeedItem => ({
   kinds: r.kinds ?? [],
   reasons: r.reasons ?? [],
   clusterHosts: r.cluster_hosts ?? 1,
+  matchedTerms: r.matched_terms ?? [],
 });
 
 export async function GET(request: NextRequest) {
@@ -148,7 +151,7 @@ export async function GET(request: NextRequest) {
     let items = basic.map(toItem);
     if (q) {
       items = items
-        .map((it) => ({ it, r: searchRelevance(q, it) }))
+        .map((it) => ({ it, r: searchRank(q, it) }))
         .filter((x) => x.r > 0)
         .sort((a, b) => b.r - a.r)
         .map((x) => x.it);
@@ -164,12 +167,10 @@ export async function GET(request: NextRequest) {
   const unscored = items.length > 0 && items.every((it) => it.importance === null);
 
   if (sort === "relevance" && q) {
+    const now = Date.now();
     items = items
-      .map((it) => ({
-        it,
-        // 질의어 관련도를 1순위로, 중요도를 보정항으로 합성한다
-        r: searchRelevance(q, it) * 2 + (it.importance ?? 0) * 0.35,
-      }))
+      .map((it) => ({ it, r: searchRank(q, { ...it, now }) }))
+      .filter((x) => x.r > 0)
       .sort((a, b) => b.r - a.r)
       .map((x) => x.it);
   }
