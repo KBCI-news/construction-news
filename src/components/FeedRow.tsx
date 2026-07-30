@@ -1,0 +1,120 @@
+"use client";
+
+import Link from "next/link";
+import type { FeedItem } from "@/app/api/feed/route";
+import { deskLabel, TIER_LABELS, type ImportanceTier } from "@/lib/lexicon";
+import { formatRelative, hostOf, stripHtml } from "@/lib/format";
+import { readerHref } from "@/lib/links";
+import { Thumbnail } from "@/components/Thumbnail";
+import { useClip } from "@/components/ClipProvider";
+
+// 등급 배지는 색만으로 구분하지 않는다 (흑백 인쇄·색맹 대응) — 항상 텍스트를 함께 쓴다.
+function TierBadge({ tier, urgent }: { tier: ImportanceTier | null; urgent: boolean }) {
+  if (urgent) {
+    return (
+      <span className="inline-flex items-center rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-bold text-white">
+        자사 리스크
+      </span>
+    );
+  }
+  if (tier === "must") {
+    return (
+      <span className="inline-flex items-center rounded bg-gray-900 px-1.5 py-0.5 text-[11px] font-bold text-white">
+        {TIER_LABELS.must}
+      </span>
+    );
+  }
+  if (tier === "important") {
+    return (
+      <span className="inline-flex items-center rounded border border-gray-900 px-1.5 py-0.5 text-[11px] font-bold text-gray-900">
+        {TIER_LABELS.important}
+      </span>
+    );
+  }
+  return null;
+}
+
+export function FeedRow({ item }: { item: FeedItem }) {
+  const { has, toggle } = useClip();
+  const clipped = has(item.link);
+  const title = stripHtml(item.title);
+  const desk = item.desks[0];
+
+  return (
+    <article className="flex items-start gap-3 overflow-hidden py-4 sm:gap-5 sm:py-5">
+      <div className="min-w-0 flex-1 break-words">
+        <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <TierBadge tier={item.tier} urgent={item.urgent} />
+          {desk && (
+            <span className="text-[12px] font-bold tracking-wide text-[#7A5E08]">
+              {deskLabel(desk)}
+            </span>
+          )}
+        </div>
+
+        <Link href={readerHref(item.link)} className="group block">
+          <h3 className="text-[18px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[20px]">
+            {title}
+          </h3>
+        </Link>
+
+        {/* 근거 칩 — 점수를 단독으로 표기하지 않는다. 담당자가 오판을 즉시 간파할 수 있어야 한다. */}
+        {item.reasons.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-x-1.5 gap-y-1">
+            {item.reasons.map((r) => (
+              <li
+                key={`${r.kind}-${r.label}`}
+                className="rounded bg-gray-100 px-1.5 py-0.5 text-[11.5px] font-medium text-gray-700"
+              >
+                {r.label}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-gray-600">
+          <span>
+            <span className="font-medium text-gray-700">
+              {item.sourceHost ?? hostOf(item.originallink)}
+            </span>
+            <span className="mx-1.5">·</span>
+            <span>{formatRelative(item.pubDate)}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              toggle({
+                link: item.link,
+                title,
+                sourceHost: item.sourceHost,
+                pubDate: item.pubDate,
+              })
+            }
+            aria-pressed={clipped}
+            aria-label={`${title} ${clipped ? "담기 해제" : "브리핑에 담기"}`}
+            className={`inline-flex min-h-[44px] items-center gap-1 rounded-lg border px-3 text-[13px] font-bold transition-colors ${
+              clipped
+                ? "border-gray-900 bg-gray-900 text-white"
+                : "border-gray-300 text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
+            }`}
+          >
+            {clipped ? "✓ 담김" : "+ 담기"}
+          </button>
+        </div>
+      </div>
+
+      <Link
+        href={readerHref(item.link)}
+        className="block shrink-0"
+        tabIndex={-1}
+        aria-hidden
+      >
+        <Thumbnail
+          src={item.imageUrl}
+          label={desk ? deskLabel(desk) : "KBCI"}
+          className="h-[60px] w-[84px] rounded-lg sm:h-[84px] sm:w-[124px]"
+        />
+      </Link>
+    </article>
+  );
+}

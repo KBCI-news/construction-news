@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { CATEGORIES } from "@/lib/categories";
+import { usePathname, useSearchParams } from "next/navigation";
+import { DESKS } from "@/lib/lexicon";
 
-// public/kb-logo.png(또는 .svg)가 있으면 그 로고를, 없으면 KB 옐로우 타일로 폴백
+// public/kb-logo.png가 있으면 그 로고를, 없으면 KB 옐로우 타일로 폴백
 function BrandLogo() {
   const [failed, setFailed] = useState(false);
   if (failed) {
@@ -16,7 +16,6 @@ function BrandLogo() {
     );
   }
   return (
-    // 회사 로고 이미지(임의 자산)라 next/image 대신 일반 img 사용
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/kb-logo.png"
@@ -27,65 +26,73 @@ function BrandLogo() {
   );
 }
 
+// 상단 내비는 데스크 상위 6개 + 법·제도. 나머지 데스크는 홈의 칩 필터에 있다.
+const TOP_DESKS = ["collection", "debtor", "npl", "creditinfo", "edoc", "own"];
+
 export function Header() {
   const pathname = usePathname();
-  const navItems = [
-    { href: "/", label: "전체" },
-    ...CATEGORIES.map((c) => ({
-      href: `/category/${c.id}`,
-      label: c.label,
-    })),
+  const params = useSearchParams();
+  const activeDesk = params.get("desk") ?? "";
+  const legal = params.get("legal") === "1";
+  const onHome = pathname === "/";
+
+  const items = [
+    { href: "/", label: "전체", active: onHome && !activeDesk && !legal },
+    {
+      href: "/?legal=1",
+      label: "법·제도",
+      active: onHome && legal,
+    },
+    ...TOP_DESKS.map((id) => {
+      const d = DESKS.find((x) => x.id === id)!;
+      return {
+        href: `/?desk=${id}`,
+        label: d.label,
+        active: onHome && activeDesk === id,
+      };
+    }),
   ];
 
   return (
-    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/85 shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)] backdrop-blur-md">
+    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/90 shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)] backdrop-blur-md">
       <div className="h-[3px] w-full bg-gradient-to-r from-[#FFB81C] to-[#FFD37A]" />
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
         <div className="flex items-center justify-between py-3">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandLogo />
             <div className="leading-tight">
-              <h1 className="text-[17px] font-extrabold tracking-tight text-gray-900">
-                KBCI 뉴스
-              </h1>
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[17px] font-extrabold tracking-tight text-gray-900">
+                KBCI 뉴스룸
+              </p>
+              <p className="text-[11px] text-gray-600">
                 KB신용정보 뉴스 모니터링
               </p>
             </div>
           </Link>
-          <span className="hidden items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1 text-[11px] font-bold tracking-wider text-gray-500 sm:inline-flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            실시간 수집
-          </span>
+          <Link
+            href="/brief"
+            className="inline-flex min-h-[40px] items-center rounded-lg border border-gray-300 px-3 text-[13px] font-bold text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#7A5E08]"
+          >
+            🖨 브리핑
+          </Link>
         </div>
 
-        <nav
-          aria-label="카테고리"
-          className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {navItems.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname?.startsWith(item.href) ?? false;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
-                  active
-                    ? "text-gray-900"
-                    : "text-gray-400 hover:text-gray-700"
-                }`}
-              >
-                {item.label}
-                {active && (
-                  <span className="absolute inset-x-2.5 -bottom-px h-[3px] rounded-full bg-[#FFB81C]" />
-                )}
-              </Link>
-            );
-          })}
+        <nav aria-label="주요 데스크" className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={item.active ? "page" : undefined}
+              className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
+                item.active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {item.label}
+              {item.active && (
+                <span className="absolute inset-x-2.5 -bottom-px h-[3px] rounded-full bg-[#FFB81C]" />
+              )}
+            </Link>
+          ))}
         </nav>
       </div>
     </header>

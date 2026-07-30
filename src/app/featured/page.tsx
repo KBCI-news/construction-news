@@ -1,9 +1,5 @@
-import FeaturedListClient from "@/components/FeaturedListClient";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "주요 뉴스 - KBCI 뉴스",
-};
-
-export default function FeaturedPage() {
-  return <FeaturedListClient />;
+export default function FeaturedRedirect() {
+  redirect("/?minScore=72");
 }

@@ -1,29 +1,17 @@
-import { CATEGORIES, getCategory } from "@/lib/categories";
-import CategoryPageClient from "@/components/CategoryPageClient";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
-export function generateStaticParams() {
-  return CATEGORIES.map((c) => ({ id: c.id }));
-}
+// 구 카테고리(6분류) → 신 데스크 매핑. 기존 링크·북마크를 살린다.
+const MAP: Record<string, string> = {
+  finance: "collection",
+  economy: "macro",
+  industry: "edoc",
+  society: "debtor",
+  law: "__legal__",
+  it: "edoc",
+};
 
-export function generateMetadata({ params }: { params: { id: string } }) {
-  const category = getCategory(params.id);
-  return {
-    title: category ? `${category.label} - KBCI 뉴스` : "KBCI 뉴스",
-  };
-}
-
-export default function CategoryPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const category = getCategory(params.id);
-  if (!category) notFound();
-  return (
-    <CategoryPageClient
-      categoryId={params.id}
-      categoryLabel={category.label}
-    />
-  );
+export default function CategoryRedirect({ params }: { params: { id: string } }) {
+  const target = MAP[params.id];
+  if (target === "__legal__") redirect("/?legal=1");
+  redirect(target ? `/?desk=${target}` : "/");
 }

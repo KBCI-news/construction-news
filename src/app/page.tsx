@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import NewsList from "@/components/NewsList";
+import NewsroomClient from "@/components/NewsroomClient";
 
 export default function Home() {
   return (
     <Suspense fallback={null}>
-      <NewsList />
+      <NewsroomClient />
     </Suspense>
   );
 }

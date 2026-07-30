@@ -9,10 +9,17 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Hit /api/cron/collect
+      - name: Collect articles
         run: |
-          curl -fsS --max-time 90 \
+          curl -fsS --max-time 120 \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_URL }}/api/cron/collect"
+
+      # 수집 직후 클러스터링·중요도 채점을 서버에서 일괄 수행한다
+      - name: Score and cluster
+        run: |
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}/api/cron/score"

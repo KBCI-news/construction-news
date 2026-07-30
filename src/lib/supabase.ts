@@ -31,4 +31,15 @@ export type ArticleRow = {
   categories: string[];
   image_url: string | null;
   collected_at: string;
+  // 큐레이션 엔진(0004_curation.sql)에서 추가된 컬럼
+  importance: number | null;
+  importance_tier: string | null;
+  urgent: boolean;
+  desks: string[];
+  kinds: string[];
+  matched_terms: string[];
+  cluster_id: string | null;
+  cluster_hosts: number;
+  is_rep: boolean;
+  scored_at: string | null;
 };
