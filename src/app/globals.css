@@ -52,7 +52,6 @@
 html {
   /* 고령 사용자 가독성을 위해 기본 폰트 크기를 키운다 */
   font-size: 17px;
-  -webkit-text-size-adjust: 100%; /* 모바일에서 글자 크기 자동 확대 방지 */
   overflow-x: hidden; /* 가로 오버플로로 인한 레이아웃 깨짐 방지 */
   scroll-behavior: smooth;
 }
@@ -101,8 +100,6 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* 더블탭 확대로 인한 의도치 않은 줌/레이아웃 틀어짐 방지 (핀치 줌은 유지) */
-  touch-action: manipulation;
 }
 
 @layer components {
@@ -220,23 +217,106 @@ button {
 }
 /* 스크롤 시 sticky 헤더 가독성 위해 부드러운 포커스 링 */
 :focus-visible {
-  outline: 2px solid rgba(255, 184, 28, 0.6);
+  outline: 3px solid #1d4ed8;
   outline-offset: 2px;
+  border-radius: 4px;
+}
+/* 어두운 면 위에서는 흰 링으로 전환 */
+.bg-gray-900 :focus-visible,
+.sheet-dark :focus-visible {
+  outline-color: #ffffff;
+}
+#main-content {
+  scroll-margin-top: 96px;
 }
 
-/* 인쇄 / PDF 저장 시 화면 전용 요소 숨김 */
+/* ------------------------------------------------------------------ *
+ * 인쇄 — 사내 게시판 부착용 A4 지면
+ * ------------------------------------------------------------------ */
+@page {
+  size: A4;
+  margin: 14mm 14mm 12mm;
+}
+
 @media print {
   .no-print {
     display: none !important;
   }
   html {
-    font-size: 14px;
+    font-size: 11pt;
   }
   body {
-    background: #ffffff;
+    background: #fff;
   }
-  .print-article {
+
+  /* 지면은 카드 장식 없이 종이 그대로 */
+  .sheet {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .sheet-head {
+    border-bottom: 1.5pt solid #111;
+    padding-bottom: 4mm;
+  }
+  .sheet-foot {
+    border-top: 0.5pt solid #999;
+    padding-top: 3mm;
+  }
+
+  /* 기사 블록은 페이지 중간에서 잘리지 않게 */
+  .brief-item {
     break-inside: avoid;
     page-break-inside: avoid;
+    padding: 3.5mm 0;
+    border-bottom: 0.5pt solid #ddd;
+  }
+  .brief-item:last-child {
+    border-bottom: 0;
+  }
+  .brief-note {
+    border-left: 2pt solid #111;
+    padding-left: 2.5mm;
+  }
+
+  /* 리더 본문 인쇄 — 화면용 장식을 걷어낸다 */
+  .print-article {
+    break-inside: auto;
+    break-after: page;
+  }
+  .print-article:last-child {
+    break-after: auto;
+  }
+  .article-body {
+    font-size: 10.5pt;
+    line-height: 1.55;
+  }
+  .article-body > p:first-of-type::first-letter {
+    float: none;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    margin: 0;
+  }
+  .article-body p {
+    orphans: 3;
+    widows: 3;
+  }
+  .article-body img,
+  .article-body figure {
+    break-inside: avoid;
+    max-width: 100%;
+  }
+  .article-body table {
+    display: table;
+    width: 100%;
+  }
+  h1, h2, h3 {
+    break-after: avoid-page;
+  }
+  a {
+    text-decoration: none;
+    color: #111;
   }
 }

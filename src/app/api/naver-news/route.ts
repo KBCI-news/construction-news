@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCategory, keywordsForCategory } from "@/lib/categories";
 
 export type NaverNewsItem = {
   title: string;
@@ -55,7 +54,6 @@ class NaverApiError extends Error {
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const q = params.get("q");
-  const categoryId = params.get("category");
   const display = Math.min(Number(params.get("display") ?? 30), 100);
   const sort = params.get("sort") === "sim" ? "sim" : "date";
 
@@ -69,24 +67,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let queries: string[];
-  if (categoryId) {
-    const category = getCategory(categoryId);
-    if (!category) {
-      return NextResponse.json(
-        { error: `Unknown category: ${categoryId}` },
-        { status: 400 },
-      );
-    }
-    queries = keywordsForCategory(categoryId);
-  } else if (q) {
-    queries = [q];
-  } else {
+  // 자체 아카이브(/api/feed)에 결과가 없을 때만 쓰는 실시간 보조 검색 경로
+  if (!q) {
     return NextResponse.json(
-      { error: "Provide either 'q' or 'category' query parameter" },
+      { error: "Provide 'q' query parameter" },
       { status: 400 },
     );
   }
+  const queries: string[] = [q];
 
   try {
     const results = await Promise.all(

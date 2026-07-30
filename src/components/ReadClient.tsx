@@ -3,12 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ArticleContent } from "@/app/api/article/route";
-import type { NewsResponseItem } from "@/app/api/news/route";
-import { CATEGORIES } from "@/lib/categories";
+import type { FeedItem } from "@/app/api/feed/route";
+import { deskLabel } from "@/lib/lexicon";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
-
-const labelOf = (id: string) =>
-  CATEGORIES.find((c) => c.id === id)?.label ?? id;
 
 export default function ReadClient() {
   const params = useSearchParams();
@@ -16,7 +13,7 @@ export default function ReadClient() {
   const url = params.get("url") ?? "";
 
   const [article, setArticle] = useState<ArticleContent | null>(null);
-  const [meta, setMeta] = useState<NewsResponseItem | null>(null);
+  const [meta, setMeta] = useState<FeedItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [fontScale, setFontScale] = useState(1);
@@ -84,10 +81,10 @@ export default function ReadClient() {
 
     (async () => {
       // 1) 메타데이터(카테고리/날짜/원문링크) 먼저 — 헤더 즉시 표시 + 폴백 URL 확보
-      const items = await fetch("/api/news", { signal: controller.signal })
+      const items = await fetch("/api/feed?range=30d&limit=200&sort=date", { signal: controller.signal })
         .then((r) => r.json())
-        .then((j) => (j.items ?? []) as NewsResponseItem[])
-        .catch(() => [] as NewsResponseItem[]);
+        .then((j) => (j.items ?? []) as FeedItem[])
+        .catch(() => [] as FeedItem[]);
       const found = items.find((it) => it.link === url) ?? null;
       setMeta(found);
 
@@ -115,7 +112,7 @@ export default function ReadClient() {
   }, [article, meta]);
 
   const source = article?.host || (url ? hostOf(url) : "");
-  const categories = meta?.categories ?? [];
+  const desks = meta?.desks ?? [];
   const leadImage = article?.leadImage || meta?.imageUrl || null;
 
   if (!url) {
@@ -189,9 +186,9 @@ export default function ReadClient() {
 
       {/* 헤더 */}
       <header className="border-b border-gray-200 pb-5">
-        {categories.length > 0 && (
-          <div className="mb-3 text-[12px] font-bold tracking-wider text-[#9A7A12]">
-            {categories.map((id) => labelOf(id)).join(" · ")}
+        {desks.length > 0 && (
+          <div className="mb-3 text-[12px] font-bold tracking-wider text-[#7A5E08]">
+            {desks.map((id) => deskLabel(id)).join(" · ")}
           </div>
         )}
         {loading && !title ? (
