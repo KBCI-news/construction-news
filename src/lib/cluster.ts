@@ -28,6 +28,8 @@ const WIRE_HOSTS = new Set([
 ]);
 
 const SIM_THRESHOLD = 0.42;
+// 변별 토큰을 2개 이상 공유할 때 적용하는 완화 임계값
+const LOOSE_THRESHOLD = 0.28;
 const MAX_CLUSTER = 12;
 
 function bigrams(title: string): Set<string> {
@@ -47,6 +49,41 @@ function dice(a: Set<string>, b: Set<string>): number {
   let inter = 0;
   for (const x of small) if (large.has(x)) inter++;
   return (2 * inter) / (a.size + b.size);
+}
+
+const normTitle = (title: string): string =>
+  stripHtml(title)
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
+
+/**
+ * 사건을 특정하는 "변별 토큰" — 숫자를 포함한 토큰(540억, 2.1억)과 3자 이상 단어.
+ * 같은 사건 보도는 표현이 달라도 이 토큰들을 공유한다.
+ */
+function keyTokens(title: string): Set<string> {
+  const raw = stripHtml(title)
+    .replace(/\[[^\]]*\]/g, "")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+  const out = new Set<string>();
+  for (const tk of raw) {
+    // 조사를 떼어 "KB증권에" 와 "KB증권" 이 같은 토큰이 되게 한다
+    const t = tk.replace(/(에서|에게|으로|이라|라며|은|는|이|가|을|를|에|의|로|와|과|도)$/u, "");
+    const w = t.length >= 2 ? t : tk;
+    if (/\d/.test(w) && w.length >= 2) out.add(w); // 540억, 2.1억, 32건
+    else if (w.length >= 3) out.add(w);
+  }
+  return out;
+}
+
+function sharedCount(a: Set<string>, b: Set<string>): number {
+  let n = 0;
+  const [small, large] = a.size < b.size ? [a, b] : [b, a];
+  for (const x of small) if (large.has(x)) n++;
+  return n;
 }
 
 // KST 기준 날짜 버킷 — UTC로 나누면 09:00 KST 경계에서 같은 사안이 갈라진다
@@ -78,6 +115,8 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
     id: string;
     repIndexTitle: Set<string>;
     repTerms: Set<string>;
+    repKeys: Set<string>;
+    repNorm: string;
     members: ClusterInput[];
   };
 
@@ -94,13 +133,25 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
     for (const it of sorted) {
       const grams = bigrams(it.title);
       const terms = new Set(it.matchedTerms ?? []);
+      const keys = keyTokens(it.title);
+      const norm = normTitle(it.title);
       let placed = false;
 
       for (const c of clusters) {
         if (c.members.length >= MAX_CLUSTER) continue;
-        if (dice(grams, c.repIndexTitle) < SIM_THRESHOLD) continue;
+
+        const d = dice(grams, c.repIndexTitle);
+        // 제목이 완전히 같으면 무조건 같은 사안 (통신사 전재 등)
+        const identical = norm.length > 0 && norm === c.repNorm;
+        // 같은 사건은 표현이 달라도 변별 토큰(숫자·고유명사)을 공유한다.
+        // 예: "KT 과징금 540억…증거 은닉" ↔ "불법 기지국에 뚫린 KT, 유출 540억 과징금"
+        const sameEvent =
+          sharedCount(keys, c.repKeys) >= 2 && d >= LOOSE_THRESHOLD;
+
+        if (!identical && d < SIM_THRESHOLD && !sameEvent) continue;
+
         // 제목이 비슷해도 업권 term을 공유하지 않으면 다른 사안으로 본다
-        if (c.repTerms.size && terms.size) {
+        if (!identical && c.repTerms.size && terms.size) {
           let shared = false;
           for (const t of terms) {
             if (c.repTerms.has(t)) {
@@ -120,6 +171,8 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
           id: it.link,
           repIndexTitle: grams,
           repTerms: terms,
+          repKeys: keys,
+          repNorm: norm,
           members: [it],
         });
       }

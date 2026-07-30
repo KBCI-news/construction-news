@@ -9,7 +9,18 @@ export const maxDuration = 60;
 // 클러스터링과 채점을 서버에서 일괄 수행한다.
 // (이전에는 브라우저가 매 페이지 로드마다 1000건을 O(n²)로 재계산했다)
 const WINDOW_HOURS = 72;
-const MAX_ROWS = 4000;
+
+// PostgREST는 요청당 행 수를 1000으로 제한하므로 .limit()에 기대지 않고
+// .range()로 명시적으로 페이지를 넘긴다. (이걸 놓쳐서 14,945건 중 1,000건만
+// 클러스터링되고 나머지가 전부 is_rep=true 로 남아 중복 노출됐다)
+const PAGE = 1000;
+
+// 클러스터링 대상: 피드 상단에 오를 수 있는 기사만. O(n²) 비용을 묶는다.
+const CLUSTER_MIN_SCORE = 45;
+const CLUSTER_MAX_ROWS = 5000;
+
+// 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
+const BACKFILL_MAX_ROWS = 3000;
 
 type Row = {
   link: string;
@@ -18,6 +29,26 @@ type Row = {
   pub_date: string;
   source_host: string | null;
 };
+
+const SELECT = "link,title,description,pub_date,source_host";
+
+async function fetchPaged(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  build: () => ReturnType<ReturnType<typeof getSupabaseAdmin>["from"]>,
+  maxRows: number,
+): Promise<Row[]> {
+  const out: Row[] = [];
+  for (let from = 0; from < maxRows; from += PAGE) {
+    const to = Math.min(from + PAGE, maxRows) - 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (build() as any).range(from, to);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as Row[];
+    out.push(...rows);
+    if (rows.length < to - from + 1) break; // 마지막 페이지
+  }
+  return out;
+}
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -31,23 +62,6 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   const since = new Date(Date.now() - WINDOW_HOURS * 3_600_000).toISOString();
 
-  const { data, error } = await supabase
-    .from("articles")
-    .select("link,title,description,pub_date,source_host")
-    .gte("pub_date", since)
-    .order("pub_date", { ascending: false })
-    .limit(MAX_ROWS);
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to read articles", detail: error.message },
-      { status: 500 },
-    );
-  }
-
-  const rows = (data ?? []) as Row[];
-  if (rows.length === 0) return NextResponse.json({ ok: true, scored: 0 });
-
   // 사내 관심 신호 — 담당자가 실제로 검색한 키워드를 순위에 되먹인다
   let internalTerms: string[] = [];
   const { data: trending } = await supabase.rpc("top_search_queries", {
@@ -58,39 +72,102 @@ export async function GET(request: NextRequest) {
     internalTerms = (trending as { query: string }[]).map((t) => t.query);
   }
 
-  // 1차: term 매칭만으로 클러스터 힌트를 얻는다 (제목 유사도 + 공통 term)
-  const prelim = rows.map((r) => ({
-    link: r.link,
-    title: r.title,
-    pubDate: r.pub_date,
-    sourceHost: r.source_host,
-    matchedTerms: scoreArticle({
-      title: r.title,
-      description: r.description,
-      pubDate: r.pub_date,
-      sourceHost: r.source_host,
-      internalTerms,
-    }).matchedTerms,
-  }));
-
-  const clusters = assignClusters(prelim);
-  const byLink = new Map(clusters.map((c) => [c.link, c]));
-
   const now = Date.now();
-  const updates = rows.map((r) => {
-    const c = byLink.get(r.link);
-    const res = scoreArticle({
+  const scoreOf = (r: Row, clusterHosts = 1, wireOnly = false) =>
+    scoreArticle({
       title: r.title,
       description: r.description,
       pubDate: r.pub_date,
       sourceHost: r.source_host,
-      clusterHosts: c?.clusterHosts ?? 1,
-      wireOnly: c?.wireOnly ?? false,
+      clusterHosts,
+      wireOnly,
       internalTerms,
       now,
     });
-    return {
+
+  const payload = new Map<string, Record<string, unknown>>();
+
+  // ---- 1) 클러스터링 대상: 상위 점수 기사 ------------------------------------
+  let clusterRows: Row[] = [];
+  try {
+    clusterRows = await fetchPaged(
+      supabase,
+      () =>
+        supabase
+          .from("articles")
+          .select(SELECT)
+          .gte("pub_date", since)
+          .gte("importance", CLUSTER_MIN_SCORE)
+          .order("importance", { ascending: false })
+          .order("pub_date", { ascending: false }) as never,
+      CLUSTER_MAX_ROWS,
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to read articles", detail: (err as Error).message },
+      { status: 500 },
+    );
+  }
+
+  if (clusterRows.length > 0) {
+    const prelim = clusterRows.map((r) => ({
       link: r.link,
+      title: r.title,
+      pubDate: r.pub_date,
+      sourceHost: r.source_host,
+      matchedTerms: scoreOf(r).matchedTerms,
+    }));
+    const clusters = assignClusters(prelim);
+    const byLink = new Map(clusters.map((c) => [c.link, c]));
+
+    for (const r of clusterRows) {
+      const c = byLink.get(r.link);
+      const res = scoreOf(r, c?.clusterHosts ?? 1, c?.wireOnly ?? false);
+      payload.set(r.link, {
+        link: r.link,
+        title: r.title,
+        pub_date: r.pub_date,
+        importance: res.score,
+        importance_tier: res.tier,
+        importance_parts: res.parts,
+        reasons: res.reasons,
+        urgent: res.urgent,
+        desks: res.desks,
+        kinds: res.kinds,
+        matched_terms: res.matchedTerms.slice(0, 40),
+        cluster_id: c?.clusterId ?? r.link,
+        cluster_hosts: c?.clusterHosts ?? 1,
+        is_rep: c?.isRep ?? true,
+        scored_at: new Date(now).toISOString(),
+      });
+    }
+  }
+
+  // ---- 2) 아직 채점되지 않은 기사에 기본 점수 부여 ---------------------------
+  let unscored: Row[] = [];
+  try {
+    unscored = await fetchPaged(
+      supabase,
+      () =>
+        supabase
+          .from("articles")
+          .select(SELECT)
+          .gte("pub_date", since)
+          .is("scored_at", null)
+          .order("pub_date", { ascending: false }) as never,
+      BACKFILL_MAX_ROWS,
+    );
+  } catch {
+    unscored = [];
+  }
+
+  for (const r of unscored) {
+    if (payload.has(r.link)) continue;
+    const res = scoreOf(r);
+    payload.set(r.link, {
+      link: r.link,
+      title: r.title,
+      pub_date: r.pub_date,
       importance: res.score,
       importance_tier: res.tier,
       importance_parts: res.parts,
@@ -99,25 +176,19 @@ export async function GET(request: NextRequest) {
       desks: res.desks,
       kinds: res.kinds,
       matched_terms: res.matchedTerms.slice(0, 40),
-      cluster_id: c?.clusterId ?? r.link,
-      cluster_hosts: c?.clusterHosts ?? 1,
-      is_rep: c?.isRep ?? true,
+      cluster_id: r.link,
+      cluster_hosts: 1,
+      is_rep: true,
       scored_at: new Date(now).toISOString(),
-    };
-  });
+    });
+  }
 
-  // link가 unique 이므로 upsert로 일괄 갱신한다.
-  // 필수 컬럼(title/pub_date)이 빠지면 insert 경로에서 실패하므로 원본 값을 함께 싣는다.
-  const byLinkRow = new Map(rows.map((r) => [r.link, r]));
-  const payload = updates.map((u) => {
-    const src = byLinkRow.get(u.link)!;
-    return { ...u, title: src.title, pub_date: src.pub_date };
-  });
-
+  // ---- 3) 저장 ---------------------------------------------------------------
+  const rows = Array.from(payload.values());
   let saved = 0;
   const CHUNK = 500;
-  for (let i = 0; i < payload.length; i += CHUNK) {
-    const chunk = payload.slice(i, i + CHUNK);
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
     const { error: upErr } = await supabase
       .from("articles")
       .upsert(chunk, { onConflict: "link" });
@@ -130,16 +201,14 @@ export async function GET(request: NextRequest) {
     saved += chunk.length;
   }
 
-  const tiers = updates.reduce<Record<string, number>>((acc, u) => {
-    acc[u.importance_tier] = (acc[u.importance_tier] ?? 0) + 1;
-    return acc;
-  }, {});
+  const absorbed = rows.filter((r) => r.is_rep === false).length;
 
   return NextResponse.json({
     ok: true,
-    scored: saved,
     windowHours: WINDOW_HOURS,
-    tiers,
-    urgent: updates.filter((u) => u.urgent).length,
+    clusterCandidates: clusterRows.length,
+    backfilled: unscored.length,
+    saved,
+    absorbed,
   });
 }
