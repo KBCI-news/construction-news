@@ -30,7 +30,6 @@ const WIRE_HOSTS = new Set([
 const SIM_THRESHOLD = 0.42;
 // 변별 토큰을 2개 이상 공유할 때 적용하는 완화 임계값
 const LOOSE_THRESHOLD = 0.28;
-const MAX_CLUSTER = 12;
 
 function bigrams(title: string): Set<string> {
   const s = stripHtml(title)
@@ -73,18 +72,48 @@ function keyTokens(title: string): Set<string> {
     // 조사를 떼어 "KB증권에" 와 "KB증권" 이 같은 토큰이 되게 한다
     const t = tk.replace(/(에서|에게|으로|이라|라며|은|는|이|가|을|를|에|의|로|와|과|도)$/u, "");
     const w = t.length >= 2 ? t : tk;
-    if (/\d/.test(w) && w.length >= 2) out.add(w); // 540억, 2.1억, 32건
+
+    const amount = normalizeAmount(w);
+    if (amount) {
+      out.add(amount);
+      continue;
+    }
+    // 기업 약칭은 짧아도 사건을 특정한다 (KT, SK, LG, KB)
+    if (/^[a-z]{2,}$/.test(w)) {
+      out.add(w);
+      continue;
+    }
+    if (/\d/.test(w) && w.length >= 2) out.add(w);
     else if (w.length >= 3) out.add(w);
   }
   return out;
 }
 
-function sharedCount(a: Set<string>, b: Set<string>): number {
-  let n = 0;
-  const [small, large] = a.size < b.size ? [a, b] : [b, a];
-  for (const x of small) if (large.has(x)) n++;
-  return n;
+/**
+ * 금액 표기를 통일한다. 같은 제재를 두고 매체마다
+ * "539억" · "539억원" · "539.7억" · "540억" 처럼 달리 쓰기 때문에
+ * 그대로 두면 같은 사건인데도 공유 토큰이 잡히지 않는다.
+ */
+function normalizeAmount(token: string): string | null {
+  const m = token.match(/^(\d+(?:\.\d+)?)(억|조|만)/u);
+  if (!m) return null;
+  const value = Number(m[1]);
+  if (!Number.isFinite(value)) return null;
+  // 반올림 오차(539 vs 540)를 흡수하도록 10 단위로 맞춘다
+  const rounded = value >= 100 ? Math.round(value / 10) * 10 : Math.round(value);
+  return `${rounded}${m[2]}`;
 }
+
+function sharedTokens(a: Set<string>, b: Set<string>): string[] {
+  const [small, large] = a.size < b.size ? [a, b] : [b, a];
+  const out: string[] = [];
+  for (const x of small) if (large.has(x)) out.push(x);
+  return out;
+}
+
+// 금액(540억)과 기업 약칭(kt, kb)은 사건을 특정하는 강한 신호다.
+const isStrongToken = (t: string): boolean =>
+  /^\d+(억|조|만)$/u.test(t) || /^[a-z]{2,4}$/.test(t);
 
 // KST 기준 날짜 버킷 — UTC로 나누면 09:00 KST 경계에서 같은 사안이 갈라진다
 function kstDayKey(pubDate: string): string {
@@ -138,15 +167,19 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
       let placed = false;
 
       for (const c of clusters) {
-        if (c.members.length >= MAX_CLUSTER) continue;
-
         const d = dice(grams, c.repIndexTitle);
         // 제목이 완전히 같으면 무조건 같은 사안 (통신사 전재 등)
         const identical = norm.length > 0 && norm === c.repNorm;
         // 같은 사건은 표현이 달라도 변별 토큰(숫자·고유명사)을 공유한다.
         // 예: "KT 과징금 540억…증거 은닉" ↔ "불법 기지국에 뚫린 KT, 유출 540억 과징금"
+        const shared = sharedTokens(keys, c.repKeys);
+        const strong = shared.filter(isStrongToken).length;
+        // 제목 표현이 크게 달라도 강한 신호가 겹치면 같은 사건으로 본다.
+        // 예: "KT 500억 원대 과징금" ↔ "KT, 1만6647명 유출로 539억원 과징금"
         const sameEvent =
-          sharedCount(keys, c.repKeys) >= 2 && d >= LOOSE_THRESHOLD;
+          strong >= 2 ||
+          (strong >= 1 && shared.length >= 3) ||
+          (shared.length >= 2 && d >= LOOSE_THRESHOLD);
 
         if (!identical && d < SIM_THRESHOLD && !sameEvent) continue;
 
