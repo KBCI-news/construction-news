@@ -18,6 +18,8 @@ const MAX = 20;
 export type ClippedArticle = {
   link: string;
   title: string;
+  /** 담는 시점에 함께 저장한다 — 인쇄물에 개요가 비는 일이 없게 */
+  summary?: string;
   sourceHost: string | null;
   pubDate: string;
 };

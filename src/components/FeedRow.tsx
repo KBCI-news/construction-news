@@ -2,37 +2,11 @@
 
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
-import { deskLabel, TIER_LABELS, type ImportanceTier } from "@/lib/lexicon";
+import { deskLabel } from "@/lib/lexicon";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
 import { readerHref } from "@/lib/links";
 import { Thumbnail } from "@/components/Thumbnail";
 import { useClip } from "@/components/ClipProvider";
-
-// 등급 배지는 색만으로 구분하지 않는다 (흑백 인쇄·색맹 대응) — 항상 텍스트를 함께 쓴다.
-function TierBadge({ tier, urgent }: { tier: ImportanceTier | null; urgent: boolean }) {
-  if (urgent) {
-    return (
-      <span className="inline-flex items-center rounded bg-red-700 px-1.5 py-0.5 text-[11px] font-bold text-white">
-        자사 리스크
-      </span>
-    );
-  }
-  if (tier === "must") {
-    return (
-      <span className="inline-flex items-center rounded bg-gray-900 px-1.5 py-0.5 text-[11px] font-bold text-white">
-        {TIER_LABELS.must}
-      </span>
-    );
-  }
-  if (tier === "important") {
-    return (
-      <span className="inline-flex items-center rounded border border-gray-900 px-1.5 py-0.5 text-[11px] font-bold text-gray-900">
-        {TIER_LABELS.important}
-      </span>
-    );
-  }
-  return null;
-}
 
 export function FeedRow({ item }: { item: FeedItem }) {
   const { has, toggle } = useClip();
@@ -43,14 +17,11 @@ export function FeedRow({ item }: { item: FeedItem }) {
   return (
     <article className="flex items-start gap-3 overflow-hidden py-4 sm:gap-5 sm:py-5">
       <div className="min-w-0 flex-1 break-words">
-        <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <TierBadge tier={item.tier} urgent={item.urgent} />
-          {desk && (
-            <span className="text-[12px] font-bold tracking-wide text-[#7A5E08]">
-              {deskLabel(desk)}
-            </span>
-          )}
-        </div>
+        {desk && (
+          <p className="mb-1.5 text-[12px] font-bold tracking-wide text-[#7A5E08]">
+            {deskLabel(desk)}
+          </p>
+        )}
 
         <Link href={readerHref(item.link)} className="group block">
           <h3 className="text-[18px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[20px]">
@@ -86,6 +57,7 @@ export function FeedRow({ item }: { item: FeedItem }) {
               toggle({
                 link: item.link,
                 title,
+                summary: stripHtml(item.description ?? "").slice(0, 220),
                 sourceHost: item.sourceHost,
                 pubDate: item.pubDate,
               })
