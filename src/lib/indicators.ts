@@ -58,7 +58,7 @@ const RULES: Rule[] = [
   {
     key: "household_delinq",
     patterns: [/가계(?:대출)?\s*연체율[^0-9%]{0,14}?(\d(?:\.\d{1,2})?)\s*%/],
-    require: /(금융감독원|금감원|한국은행|한은|전체|전국|국내은행|은행권)/,
+    require: /(금융감독원|금감원|한국은행|한은|전체|전국|국내은행|은행권|5대 은행|시중은행)/,
     exclude: LOCAL_OR_SINGLE,
     min: 0.05,
     max: 15,
@@ -78,7 +78,7 @@ const RULES: Rule[] = [
   {
     key: "card_delinq",
     patterns: [/카드(?:사)?\s*연체율[^0-9%]{0,14}?(\d(?:\.\d{1,2})?)\s*%/],
-    require: /(금융감독원|금감원|여신금융협회|전업카드사|카드업계 전체)/,
+    require: /(금융감독원|금감원|여신금융협회|전업카드사|카드업계|카드사 전체|업계)/,
     exclude: LOCAL_OR_SINGLE,
     min: 0.05,
     max: 15,
@@ -87,7 +87,7 @@ const RULES: Rule[] = [
   {
     key: "savings_delinq",
     patterns: [/저축은행\s*연체율[^0-9%]{0,14}?(\d(?:\.\d{1,2})?)\s*%/],
-    require: /(금융감독원|금감원|저축은행중앙회|업권|전체)/,
+    require: /(금융감독원|금감원|저축은행중앙회|저축은행업계|업권|업계|전체)/,
     exclude: LOCAL_OR_SINGLE,
     min: 0.05,
     max: 30,
