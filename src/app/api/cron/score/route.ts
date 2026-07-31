@@ -291,5 +291,6 @@ export async function GET(request: NextRequest) {
     absorbed,
     indicatorScanned: indicatorRows.length,
     indicatorsUpdated,
+    officialKeys: Array.from(official),
   });
 }
