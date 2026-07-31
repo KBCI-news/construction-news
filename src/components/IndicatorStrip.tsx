@@ -84,8 +84,11 @@ function Trend({ points }: { points: IndicatorPoint[] }) {
 }
 
 /**
- * 경제지표 스트립. 값은 수집된 기사에서 자동 추출되며 출처 기사로 바로 이동할 수 있다.
+ * 경제지표 스트립. 값은 한국은행 등 기관 원본 통계나 수집 기사에서 자동으로 채워진다.
  * 확인되지 않은 지표는 표시하지 않는다 — 게시판에 틀린 숫자가 붙는 것이 더 나쁘다.
+ *
+ * 카드는 링크가 아니다. 추이를 보려고 누른 손가락이 외부 기사로 튀어나가면
+ * 보던 목록 위치를 잃는다 — 특히 모바일에서.
  */
 export function IndicatorStrip() {
   const [items, setItems] = useState<Indicator[]>([]);
@@ -103,19 +106,24 @@ export function IndicatorStrip() {
     <section className="card px-3 py-3 sm:px-4" aria-label="경제지표">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 className="text-[12px] font-bold tracking-wide text-gray-600">경제지표</h2>
-        <p className="text-[11px] text-gray-500">기사 자동 추출 · 출처 확인 권장</p>
+        <p className="text-[11px] text-gray-500">자동 수집 · 출처 표기 확인</p>
       </div>
       <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it) => (
           <li key={it.key} className="shrink-0">
-            <a
-              href={it.sourceLink ?? "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-[172px] rounded-xl border border-[var(--line)] px-3 py-2.5 transition-colors hover:border-[#FFB81C]"
-              title={it.sourceHost ? `출처: ${it.sourceHost}` : undefined}
-            >
-              <p className="text-[11.5px] font-medium text-gray-600">{it.label}</p>
+            <div className="w-[172px] rounded-xl border border-[var(--line)] px-3 py-2.5">
+              <p className="flex items-center justify-between gap-1">
+                <span className="text-[11.5px] font-medium text-gray-600">{it.label}</span>
+                <span
+                  className={`rounded px-1 py-px text-[10px] font-bold ${
+                    it.sourceKind === "official"
+                      ? "bg-[#FFF4D6] text-[#8A6400]"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {it.sourceLabel}
+                </span>
+              </p>
               <p className="mt-0.5 flex items-baseline gap-1 whitespace-nowrap">
                 <span className="text-[21px] font-extrabold tabular-nums tracking-tight text-gray-900">
                   {it.value}
@@ -126,7 +134,7 @@ export function IndicatorStrip() {
                 </span>
               </p>
               <TrendChart points={it.history} />
-            </a>
+            </div>
           </li>
         ))}
       </ul>

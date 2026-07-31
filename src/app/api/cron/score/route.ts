@@ -4,6 +4,7 @@ import { assignClusters } from "@/lib/cluster";
 import { scoreArticle } from "@/lib/scoring";
 import { extractIndicators } from "@/lib/indicators";
 import { sourceTier } from "@/lib/lexicon";
+import { officialIndicatorKeys } from "@/lib/indicator-source";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -242,8 +243,11 @@ export async function GET(request: NextRequest) {
       if (!found.has(hit.key)) found.set(hit.key, { value: hit.value, row: r });
     }
   }
+  // 한국은행 ECOS 등 기관 원본으로 채워지는 지표는 기사 추출이 덮어쓰지 않는다
+  const official = await officialIndicatorKeys(supabase);
   let indicatorsUpdated = 0;
   for (const [key, { value, row }] of found) {
+    if (official.has(key)) continue;
     const { error: indErr } = await supabase
       .from("indicators")
       .update({
