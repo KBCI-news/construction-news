@@ -10,12 +10,14 @@ import { IndicatorStrip } from "@/components/IndicatorStrip";
 import { useClip } from "@/components/ClipProvider";
 
 type SortKey = "score" | "date" | "relevance";
-type RangeKey = "24h" | "7d" | "30d";
+type RangeKey = "24h" | "7d" | "30d" | "all";
 
+// 디폴트는 전체 — 처음 열었을 때 조건 때문에 빈 화면이 나오지 않게 한다
 const RANGE_LABEL: Record<RangeKey, string> = {
-  "24h": "오늘",
+  "24h": "1일",
   "7d": "1주",
-  "30d": "1개월",
+  "30d": "1달",
+  all: "전체",
 };
 
 const PAGE = 30;
@@ -37,7 +39,7 @@ export default function NewsroomClient() {
   const desk = params.get("desk") ?? "";
   const legal = params.get("legal") === "1";
   const general = params.get("scope") === "general";
-  const range = (params.get("range") as RangeKey) || "7d";
+  const range = (params.get("range") as RangeKey) || "all";
   const sort = (params.get("sort") as SortKey) || (q ? "relevance" : "score");
 
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -312,10 +314,10 @@ export default function NewsroomClient() {
           <div className="py-14 text-center">
             <p className="text-[14px] text-gray-600">조건에 맞는 기사가 없습니다.</p>
             <button
-              onClick={() => setParam({ desk: null, legal: null, range: "30d" })}
+              onClick={() => setParam({ desk: null, legal: null, range: null })}
               className="mt-3 min-h-[44px] rounded-lg border border-gray-300 px-4 text-[13px] font-bold text-gray-700"
             >
-              조건 넓히기 (1개월 · 전체 주제)
+              조건 넓히기 (전체 기간 · 전체 주제)
             </button>
           </div>
         ) : (

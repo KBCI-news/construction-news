@@ -31,10 +31,12 @@ export type FeedResponse = {
   unscored: boolean;
 };
 
-const RANGE_HOURS: Record<string, number> = {
+// "all"은 보관 중인 아카이브 전체(30일 보존) — 기간 필터를 걸지 않는다
+const RANGE_HOURS: Record<string, number | null> = {
   "24h": 24,
   "7d": 24 * 7,
   "30d": 24 * 30,
+  all: null,
 };
 
 const SELECT =
@@ -80,7 +82,8 @@ export async function GET(request: NextRequest) {
   // scope=general : 우리 업권 사전에 걸리지 않은 '일반 뉴스'
   const scope = p.get("scope");
   const kinds = p.getAll("kind").filter(Boolean);
-  const range = RANGE_HOURS[p.get("range") ?? "7d"] ?? RANGE_HOURS["7d"];
+  const rangeKey = p.get("range") ?? "all";
+  const range = rangeKey in RANGE_HOURS ? RANGE_HOURS[rangeKey] : null;
   const q = (p.get("q") ?? "").trim();
   const sortParam = p.get("sort");
   const minScore = Number(p.get("minScore") ?? "");
@@ -97,12 +100,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const since = new Date(Date.now() - range * 3_600_000).toISOString();
+  const since =
+    range === null ? null : new Date(Date.now() - range * 3_600_000).toISOString();
 
-  let query = supabase
-    .from("articles")
-    .select(SELECT)
-    .gte("pub_date", since);
+  let query = supabase.from("articles").select(SELECT);
+  if (since) query = query.gte("pub_date", since);
 
   if (desk) query = query.contains("desks", [desk]);
   if (scope === "general") query = query.eq("desks", "{}");
@@ -137,10 +139,11 @@ export async function GET(request: NextRequest) {
   // 큐레이션 마이그레이션(0004)이 아직 적용되지 않은 환경에서도 사이트가 죽지 않게
   // 기본 컬럼만으로 재조회한다. 등급·근거는 UI에서 자동으로 감춰진다.
   if (error) {
-    const legacy = await supabase
+    let legacyQuery = supabase
       .from("articles")
-      .select("link,original_link,title,description,pub_date,image_url,source_host")
-      .gte("pub_date", since)
+      .select("link,original_link,title,description,pub_date,image_url,source_host");
+    if (since) legacyQuery = legacyQuery.gte("pub_date", since);
+    const legacy = await legacyQuery
       .order("pub_date", { ascending: false })
       .limit(limit);
 

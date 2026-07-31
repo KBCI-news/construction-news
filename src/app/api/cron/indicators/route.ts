@@ -138,6 +138,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     scannedArticles: rows.length,
+    // 기사 추출이 건드리지 않은 공식 지표 — 비어 있으면 안 되는 값이므로 노출한다
+    officialKeys: Array.from(official),
     points: list.length,
     perKey,
     inserted,
