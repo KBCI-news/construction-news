@@ -143,6 +143,9 @@ export default function NewsroomClient() {
 
   return (
     <div className="space-y-3 sm:space-y-4">
+      {/* 지표가 맨 위 — 게시판에 옮겨 적는 숫자라 열자마자 보여야 한다 */}
+      <IndicatorStrip />
+
       {/* 검색 + 브리핑 진입 */}
       <div className="flex items-center gap-2 sm:gap-3">
         <form onSubmit={submitSearch} className="card flex min-w-0 flex-1 items-center px-3">
@@ -193,29 +196,10 @@ export default function NewsroomClient() {
         </Link>
       </div>
 
-      <IndicatorStrip />
-
-      {/* 범위 + 주제를 한 카드로 — 모바일 세로 공간을 아낀다 */}
-      <div className="card overflow-hidden">
-        <div
-          role="tablist"
-          aria-label="뉴스 범위"
-          className="grid grid-cols-2 gap-1.5 p-1.5"
-        >
-          <TabButton
-            active={!general}
-            onClick={() => setParam({ scope: null })}
-            label="업무 관련 뉴스"
-          />
-          <TabButton
-            active={general}
-            onClick={() => setParam({ scope: "general", desk: null, legal: null })}
-            label="일반 뉴스"
-          />
-        </div>
-
-        {!general && (
-          <div className="border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
+      {/* 주제 칩 — 일반 뉴스는 GNB에서 진입하므로 여기서는 범위 탭을 두지 않는다 */}
+      {!general && (
+        <div className="card overflow-hidden">
+          <div className="px-3 py-2.5 sm:px-4">
             <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
             {[
               { id: "", label: "전체" },
@@ -251,8 +235,8 @@ export default function NewsroomClient() {
               </p>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 3단계: 기간·정렬 */}
       <div className="card flex flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-2.5 sm:gap-x-6 sm:p-4">
@@ -344,29 +328,6 @@ export default function NewsroomClient() {
         )}
       </section>
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={`rounded-[13px] px-4 py-3 text-[15px] font-bold transition-colors ${
-        active ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
