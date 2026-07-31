@@ -54,8 +54,8 @@ export const DESKS: Desk[] = [
   },
   {
     id: "survey",
-    label: "조사",
-    definition: "신용조사·임대차조사·권리조사 등 조사 업무",
+    label: "임대차·권리조사",
+    definition: "임대차조사·권리조사 사업 — 전세사기, 보증금, 등기·권리관계",
     className: "text-cyan-800",
   },
   {
@@ -268,33 +268,36 @@ export const TERMS: Term[] = [
   t("개인정보 과징금", 1, "creditinfo"),
   t("신용정보 유출", 1, "creditinfo"),
 
-  // --- survey : 조사 (신용조사·임대차·권리조사) ---
-  t("신용조사", 0, "survey", true),
+  // --- survey : 임대차·권리조사 (자사 사업) ---
+  // "조사"라는 말이 들어간 일반 기사(농지 현장조사, 수사기관 소재파악 등)가
+  // 이 데스크를 오염시켰다. 범용 조사 term을 걷어내고 임대차·권리관계로 좁힌다.
   t("임대차조사", 0, "survey", true),
   t("권리조사", 0, "survey", true),
-  t("현장조사", 1, "survey", true),
-  t("임대차 실태조사", 1, "survey", true),
   t("전세사기", 1, "survey", true),
+  t("깡통전세", 1, "survey", true),
+  t("역전세", 1, "survey"),
+  t("전세보증금", 1, "survey", true),
+  t("보증금 반환", 1, "survey"),
+  t("전세보증금 반환보증", 1, "survey"),
+  t("주택도시보증공사", 1, "survey", true),
+  t("보증사고", 1, "survey"),
+  t("임대차보호법", 1, "survey", true),
+  t("임대차 실태조사", 1, "survey", true),
+  t("주택임대차", 1, "survey"),
+  t("상가임대차", 1, "survey"),
   t("확정일자", 1, "survey"),
   t("전입세대열람", 1, "survey"),
+  t("임차권등기", 1, "survey"),
+  t("대항력", 1, "survey"),
+  t("우선변제권", 1, "survey"),
+  t("선순위 임차인", 1, "survey"),
   t("등기부등본", 1, "survey"),
   t("등기사항증명서", 1, "survey"),
   t("근저당권", 1, "survey"),
-  t("선순위 임차인", 1, "survey"),
-  t("대항력", 1, "survey"),
-  t("우선변제권", 1, "survey"),
-  t("보증금 반환", 1, "survey"),
-  t("전세보증금", 1, "survey"),
-  t("임대차보호법", 1, "survey", true),
-  t("주택임대차", 1, "survey"),
-  t("상가임대차", 1, "survey"),
   t("권리분석", 1, "survey"),
   t("부동산 경매", 1, "survey"),
   t("공매", 1, "survey"),
   t("배당요구", 1, "survey"),
-  t("신용조회", 1, "survey"),
-  t("재산조사", 1, "survey"),
-  t("소재파악", 1, "survey"),
 
   // --- lending : 대출·여신 (추심 물량의 선행지표) ---
   t("가계대출", 1, "lending", true),
@@ -560,6 +563,8 @@ export const TERM_COLLISIONS: { term: string; voidedBy: string[] }[] = [
   // "등기부등본"이 홍보 노이즈 "기부"에 걸려 권리조사 기사가 75% 감점됐다
   { term: "기부", voidedBy: ["등기부", "기부채납", "기부채무"] },
   { term: "수상", voidedBy: ["수상한", "수상스키", "수상운송"] },
+  // 증시 "공매도"는 자산 처분 절차인 "공매"와 무관하다
+  { term: "공매", voidedBy: ["공매도"] },
   { term: "증정", voidedBy: ["실증정"] },
   // 법원 전자소송 근거법("민사소송 등에서의 전자문서 이용법")은
   // 우리 사업의 전자문서법(전자문서 및 전자거래 기본법)과 다른 법이다

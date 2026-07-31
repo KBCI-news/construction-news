@@ -1,0 +1,135 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase";
+import {
+  ECOS_SERIES,
+  discoverItems,
+  discoverTables,
+  fetchEcosSeries,
+  hasEcosKey,
+} from "@/lib/ecos";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+// 한국은행 ECOS에서 지표 원본 통계를 가져와 시계열에 적재한다.
+// 기사 추출과 달리 보도 유무와 무관하게 값이 채워지고, 전망치·변동폭이
+// 섞일 여지가 없다. ECOS_API_KEY가 없으면 아무 일도 하지 않는다.
+//
+// 진단용:
+//   ?discover=연체율   통계표 코드 검색
+//   ?items=722Y001     통계표의 세부항목 코드 목록
+
+const HOST = "ecos.bok.or.kr";
+
+/** 0007 마이그레이션 이전 스키마로 물러설 때 쓰는 필드 제거 */
+const withoutSourceKind = <T extends { source_kind?: string }>(row: T) => {
+  const copy = { ...row };
+  delete copy.source_kind;
+  return copy;
+};
+
+export async function GET(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 500 });
+  }
+  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!hasEcosKey()) {
+    return NextResponse.json({
+      ok: true,
+      skipped: "ECOS_API_KEY 미설정 — 기사 추출 방식을 그대로 사용합니다",
+    });
+  }
+
+  const url = new URL(request.url);
+  const discover = url.searchParams.get("discover");
+  const items = url.searchParams.get("items");
+  if (discover) {
+    return NextResponse.json({ ok: true, tables: await discoverTables(discover) });
+  }
+  if (items) {
+    return NextResponse.json({ ok: true, items: await discoverItems(items) });
+  }
+
+  const supabase = getSupabaseAdmin();
+  const now = Date.now();
+
+  const report: Record<string, string> = {};
+  let historyRows = 0;
+  let updated = 0;
+
+  for (const series of ECOS_SERIES) {
+    const res = await fetchEcosSeries(series, now);
+    if (!res.ok) {
+      report[series.key] = `건너뜀 — ${res.reason}`;
+      continue;
+    }
+
+    const rows = res.points.map((p) => ({
+      key: series.key,
+      value: p.value,
+      as_of: p.asOf,
+      source_host: HOST,
+      source_link: null as string | null,
+      source_kind: "official",
+    }));
+
+    // 같은 (지표, 시점)의 공식값은 하나뿐이므로 갱신 시 덮어쓴다.
+    // 마이그레이션 0007 이전 스키마에서도 죽지 않도록 한 단계 물러선다.
+    let histErr = (
+      await supabase
+        .from("indicator_history")
+        .upsert(rows, { onConflict: "key,as_of", ignoreDuplicates: false })
+    ).error;
+    if (histErr) {
+      histErr = (
+        await supabase
+          .from("indicator_history")
+          .upsert(rows.map(withoutSourceKind), {
+            onConflict: "key,as_of,value",
+            ignoreDuplicates: true,
+          })
+      ).error;
+    }
+    if (histErr) {
+      report[series.key] = `이력 적재 실패 — ${histErr.message}`;
+      continue;
+    }
+    historyRows += rows.length;
+
+    const last = res.points[res.points.length - 1];
+    const current = {
+      key: series.key,
+      label: series.label,
+      unit: series.unit,
+      sort_order: series.sortOrder,
+      value: String(last.value),
+      as_of: last.asOf,
+      source_host: HOST,
+      source_link: null as string | null,
+      source_title: res.statName,
+      source_kind: "official",
+      updated_at: new Date(now).toISOString(),
+    };
+    let curErr = (
+      await supabase.from("indicators").upsert(current, { onConflict: "key" })
+    ).error;
+    if (curErr) {
+      curErr = (
+        await supabase
+          .from("indicators")
+          .upsert(withoutSourceKind(current), { onConflict: "key" })
+      ).error;
+    }
+    if (curErr) {
+      report[series.key] = `현재값 갱신 실패 — ${curErr.message}`;
+      continue;
+    }
+    updated += 1;
+    report[series.key] = `${res.points.length}점 적재 · 최신 ${last.value}${series.unit} (${last.time})`;
+  }
+
+  return NextResponse.json({ ok: true, updated, historyRows, report });
+}

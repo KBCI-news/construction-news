@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { extractIndicators } from "@/lib/indicators";
 import { sourceTier } from "@/lib/lexicon";
+import { officialIndicatorKeys } from "@/lib/indicator-source";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,9 +67,13 @@ export async function GET(request: NextRequest) {
     { key: string; value: number; asOf: string; host: string | null; link: string }
   >();
 
+  // 기관 원본으로 채워지는 지표는 기사 추출 점을 섞지 않는다
+  const official = await officialIndicatorKeys(supabase);
+
   for (const r of rows) {
     if (sourceTier(r.source_host) < 0.8) continue;
     for (const hit of extractIndicators(r.title, r.description)) {
+      if (official.has(hit.key)) continue;
       const value = Number(hit.value.replace(/,/g, ""));
       if (!Number.isFinite(value)) continue;
       const d = new Date(r.pub_date);

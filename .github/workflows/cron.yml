@@ -24,7 +24,16 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_URL }}/api/cron/score"
 
+      # 지표 원본 — 한국은행 ECOS에서 통계를 직접 받아온다.
+      # ECOS_API_KEY가 없으면 즉시 skip 응답이라 실패하지 않는다.
+      - name: Sync official indicators (ECOS)
+        run: |
+          curl -fsS --max-time 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}/api/cron/ecos"
+
       # 지표 시계열 — 30일 아카이브를 훑어 추이 데이터를 채운다
+      # (기관 통계가 있는 지표는 건너뛴다)
       - name: Backfill indicator history
         run: |
           curl -fsS --max-time 120 \

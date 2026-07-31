@@ -4,6 +4,7 @@ import { assignClusters } from "@/lib/cluster";
 import { scoreArticle } from "@/lib/scoring";
 import { extractIndicators } from "@/lib/indicators";
 import { sourceTier } from "@/lib/lexicon";
+import { officialIndicatorKeys } from "@/lib/indicator-source";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,9 +19,11 @@ const WINDOW_HOURS = 24 * 7;
 // 클러스터링되고 나머지가 전부 is_rep=true 로 남아 중복 노출됐다)
 const PAGE = 1000;
 
-// 클러스터링 대상: 피드 상단에 오를 수 있는 기사만. O(n²) 비용을 묶는다.
-const CLUSTER_MIN_SCORE = 45;
-const CLUSTER_MAX_ROWS = 5000;
+// 클러스터링 대상: 피드에 노출될 수 있는 기사. O(n²) 비용을 묶는다.
+// (45로 두었더니 30점대 기사가 클러스터링에서 통째로 빠져 "박용갑 의원…추심
+//  중단" 같은 사안이 5건씩 나란히 노출됐다. 현재 7일 창의 30점 이상은 ~4.5천)
+const CLUSTER_MIN_SCORE = 30;
+const CLUSTER_MAX_ROWS = 6000;
 
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;
@@ -242,8 +245,11 @@ export async function GET(request: NextRequest) {
       if (!found.has(hit.key)) found.set(hit.key, { value: hit.value, row: r });
     }
   }
+  // 한국은행 ECOS 등 기관 원본으로 채워지는 지표는 기사 추출이 덮어쓰지 않는다
+  const official = await officialIndicatorKeys(supabase);
   let indicatorsUpdated = 0;
   for (const [key, { value, row }] of found) {
+    if (official.has(key)) continue;
     const { error: indErr } = await supabase
       .from("indicators")
       .update({
