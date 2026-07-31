@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/app/api/feed/route";
 import { DESKS, LEGAL_KINDS, getDesk } from "@/lib/lexicon";
 import { FeedRow } from "@/components/FeedRow";
+import { HScroll } from "@/components/HScroll";
 import { IndicatorStrip } from "@/components/IndicatorStrip";
 import { useClip } from "@/components/ClipProvider";
 
@@ -200,7 +201,8 @@ export default function NewsroomClient() {
       {!general && (
         <div className="card overflow-hidden">
           <div className="px-3 py-2.5 sm:px-4">
-            <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
+            <HScroll className="-mx-1 px-1 pb-0.5 sm:overflow-visible">
+            <ul className="flex gap-1.5 sm:flex-wrap">
             {[
               { id: "", label: "전체" },
               { id: "__legal__", label: "법·제도" },
@@ -229,6 +231,7 @@ export default function NewsroomClient() {
               );
             })}
             </ul>
+            </HScroll>
             {deskInfo && (
               <p className="mt-2 text-[12.5px] text-gray-600">
                 {deskInfo.definition}
