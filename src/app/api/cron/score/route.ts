@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { assignClusters } from "@/lib/cluster";
 import { scoreArticle } from "@/lib/scoring";
 import { extractIndicators } from "@/lib/indicators";
+import { sourceTier } from "@/lib/lexicon";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -219,8 +220,6 @@ export async function GET(request: NextRequest) {
           "description.ilike.%연체율%",
           "title.ilike.%기준금리%",
           "description.ilike.%기준금리%",
-          "title.ilike.%환율%",
-          "description.ilike.%환율%",
         ].join(","),
       )
       .order("pub_date", { ascending: false })
@@ -236,6 +235,9 @@ export async function GET(request: NextRequest) {
     (a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime(),
   );
   for (const r of scanned) {
+    // 지표는 게시물에 그대로 쓰이므로 신뢰할 만한 매체만 인정한다
+    // (암호화폐·미등록 매체에서 뽑힌 수치가 올라오던 문제)
+    if (sourceTier(r.source_host) < 0.8) continue;
     for (const hit of extractIndicators(r.title, r.description)) {
       if (!found.has(hit.key)) found.set(hit.key, { value: hit.value, row: r });
     }

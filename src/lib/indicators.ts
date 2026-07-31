@@ -6,10 +6,12 @@ import { stripHtml } from "@/lib/format";
 //
 // 실제 수집 데이터에는 영국·미국 기준금리, 특정 은행(BNK)·지역(제주·울산)
 // 연체율이 섞여 있다. 문맥 조건을 통과하지 못하면 값을 버린다.
+//
+// 환율은 제외한다 — 30분 주기 뉴스 추출로는 늘 낡은 값이라
+// 실시간 시세로 오해될 뿐 업무 판단에 쓰이지 않는다.
 
 export type IndicatorKey =
   | "base_rate"
-  | "usd_krw"
   | "household_delinq"
   | "bank_delinq"
   | "card_delinq"
@@ -35,14 +37,16 @@ const FOREIGN =
 
 // 전체 집계가 아닌 개별사·지역 수치
 const LOCAL_OR_SINGLE =
-  /(제주|울산|부산|대구|광주|전북|경남|강원|충북|충남|전남|경북|BNK|DGB|JB|iM|아이엠|신한은행|국민은행|하나은행|우리은행|농협은행|기업은행|지방은행|자영업자)/;
+  /(제주|울산|부산|대구|광주|전북|경남|강원|충북|충남|전남|경북|BNK|DGB|JB|iM|아이엠|신한은행|국민은행|하나은행|우리은행|농협은행|기업은행|지방은행|자영업자|KB국민카드|신한카드|삼성카드|현대카드|하나카드|롯데카드|우리카드|BC카드|비씨카드)/;
 
 const RULES: Rule[] = [
   {
     key: "base_rate",
+    // 순서 중요: "…%로/으로" (목표 수준) 를 먼저 본다.
+    // 변동폭("0.25%포인트")은 어느 패턴에도 걸리지 않는다.
     patterns: [
-      /기준금리[^0-9%]{0,14}?(\d(?:\.\d{1,2})?)\s*%/,
-      /기준금리를?[^0-9%]{0,14}?연\s*(\d(?:\.\d{1,2})?)\s*%/,
+      /기준금리.{0,40}?(\d(?:\.\d{1,2})?)\s*%\s*(?:로|으로)/,
+      /기준금리[^0-9%]{0,14}?연\s*(\d(?:\.\d{1,2})?)\s*%(?!\s*포인트|p)/,
     ],
     // 한국은행 맥락일 때만 인정
     require: /(한국은행|한은|금융통화위원회|금통위)/,
@@ -50,19 +54,6 @@ const RULES: Rule[] = [
     min: 0.25,
     max: 6,
     digits: 2,
-  },
-  {
-    key: "usd_krw",
-    patterns: [
-      /(?:원[·/]?달러\s*환율|환율)[^0-9]{0,16}?(1[,.]?\d{3}(?:\.\d)?)\s*원/,
-      /달러당[^0-9]{0,10}?(1[,.]?\d{3}(?:\.\d)?)\s*원/,
-    ],
-    require: /(원[·/]?달러|서울外|서울 외환|환율)/,
-    // "고정 환율 기준 43억 원" 같은 환산 표현 배제
-    exclude: /(환율 기준|환산|고정 환율)/,
-    min: 900,
-    max: 2000,
-    digits: 1,
   },
   {
     key: "household_delinq",
@@ -87,7 +78,7 @@ const RULES: Rule[] = [
   {
     key: "card_delinq",
     patterns: [/카드(?:사)?\s*연체율[^0-9%]{0,14}?(\d(?:\.\d{1,2})?)\s*%/],
-    require: /(금융감독원|금감원|카드사|여신금융|전업카드)/,
+    require: /(금융감독원|금감원|여신금융협회|전업카드사|카드업계 전체)/,
     exclude: LOCAL_OR_SINGLE,
     min: 0.05,
     max: 15,
@@ -122,10 +113,7 @@ export function extractIndicators(
       if (!m?.[1]) continue;
       const n = toNumber(m[1]);
       if (!Number.isFinite(n) || n < rule.min || n > rule.max) continue;
-      const value =
-        rule.key === "usd_krw"
-          ? n.toLocaleString("ko-KR", { maximumFractionDigits: 1 })
-          : String(Number(n.toFixed(rule.digits)));
+      const value = String(Number(n.toFixed(rule.digits)));
       out.push({ key: rule.key, value });
       break;
     }

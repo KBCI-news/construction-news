@@ -197,13 +197,11 @@ export default function NewsroomClient() {
             active={!general}
             onClick={() => setParam({ scope: null })}
             label="업무 관련 뉴스"
-            hint="우리 업권 사전에 걸린 기사"
           />
           <TabButton
             active={general}
             onClick={() => setParam({ scope: "general", desk: null, legal: null })}
             label="일반 뉴스"
-            hint="그 외 전체 수집 기사"
           />
         </div>
       </div>
@@ -348,28 +346,21 @@ function TabButton({
   active,
   onClick,
   label,
-  hint,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  hint: string;
 }) {
   return (
     <button
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`rounded-[13px] px-4 py-2.5 text-left transition-colors ${
+      className={`rounded-[13px] px-4 py-3 text-[15px] font-bold transition-colors ${
         active ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
       }`}
     >
-      <span className="block text-[15px] font-bold">{label}</span>
-      <span
-        className={`mt-0.5 block text-[11.5px] ${active ? "text-white/75" : "text-gray-500"}`}
-      >
-        {hint}
-      </span>
+      {label}
     </button>
   );
 }
