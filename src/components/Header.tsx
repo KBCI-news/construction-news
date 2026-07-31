@@ -34,10 +34,15 @@ export function Header() {
   const params = useSearchParams();
   const activeDesk = params.get("desk") ?? "";
   const legal = params.get("legal") === "1";
+  const general = params.get("scope") === "general";
   const onHome = pathname === "/";
 
   const items = [
-    { href: "/", label: "전체", active: onHome && !activeDesk && !legal },
+    {
+      href: "/",
+      label: "전체",
+      active: onHome && !activeDesk && !legal && !general,
+    },
     {
       href: "/?legal=1",
       label: "법·제도",
@@ -48,9 +53,15 @@ export function Header() {
       return {
         href: `/?desk=${id}`,
         label: d.label,
-        active: onHome && activeDesk === id,
+        active: onHome && activeDesk === id && !general,
       };
     }),
+    // 업무 데스크와 성격이 달라 맨 끝에 둔다 — 사전에 안 걸린 나머지 전부
+    {
+      href: "/?scope=general",
+      label: "일반 뉴스",
+      active: onHome && general,
+    },
   ];
 
   return (
