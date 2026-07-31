@@ -19,9 +19,11 @@ const WINDOW_HOURS = 24 * 7;
 // 클러스터링되고 나머지가 전부 is_rep=true 로 남아 중복 노출됐다)
 const PAGE = 1000;
 
-// 클러스터링 대상: 피드 상단에 오를 수 있는 기사만. O(n²) 비용을 묶는다.
-const CLUSTER_MIN_SCORE = 45;
-const CLUSTER_MAX_ROWS = 5000;
+// 클러스터링 대상: 피드에 노출될 수 있는 기사. O(n²) 비용을 묶는다.
+// (45로 두었더니 30점대 기사가 클러스터링에서 통째로 빠져 "박용갑 의원…추심
+//  중단" 같은 사안이 5건씩 나란히 노출됐다. 현재 7일 창의 30점 이상은 ~4.5천)
+const CLUSTER_MIN_SCORE = 30;
+const CLUSTER_MAX_ROWS = 6000;
 
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;

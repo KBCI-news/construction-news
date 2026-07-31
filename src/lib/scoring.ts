@@ -141,21 +141,21 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
     (e) => !allTerms.some((o) => o !== e.term && o.includes(e.term)),
   );
 
-  // 1순위: 제목에 근거가 있는 데스크
+  // 데스크는 제목 근거로만 붙는다.
+  // 요약·본문 근거 폴백은 폐기했다 — 포털 요약에 관련기사 문장이 섞여 들어와
+  // 반도체 실적 기사가 "개인정보 유출" 두 번 스친 것만으로 정보보호에 오르던
+  // 문제. 제목이 그 사안을 다루지 않는 기사는 데스크 소속이 아니다.
+  //  - T0·T1 : 제목 등장만으로 소속
+  //  - T2    : 같은 데스크의 다른 독립 근거가 하나 더 있어야 소속
+  //  - T3    : 데스크 근거가 아니다 (거시는 지표 스트립이 담당한다)
   for (const e of independent) {
-    if (e.field === "title") deskSet.add(e.desk);
-  }
-
-  // 제목 근거가 전혀 없으면, 요약·본문 근거가 충분히 강할 때만 하나 붙인다
-  if (deskSet.size === 0) {
-    const strong = independent.filter((e) => e.tier <= 1);
-    if (strong.length >= 2 && strong.some((e) => e.tier === 0)) {
-      const byDesk = new Map<DeskId, number>();
-      for (const e of strong) {
-        byDesk.set(e.desk, (byDesk.get(e.desk) ?? 0) + (e.tier === 0 ? 3 : 2));
-      }
-      const best = Array.from(byDesk.entries()).sort((a, b) => b[1] - a[1])[0];
-      if (best) deskSet.add(best[0]);
+    if (e.field !== "title") continue;
+    if (e.tier <= 1) deskSet.add(e.desk);
+    else if (
+      e.tier === 2 &&
+      independent.some((o) => o !== e && o.desk === e.desk)
+    ) {
+      deskSet.add(e.desk);
     }
   }
 
@@ -225,6 +225,16 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
   }
   if ((input.description ?? "").length < 30 && c <= 1) {
     penalty *= 0.8;
+  }
+
+  // 홍보성 기사는 데스크에 올리지 않는다 — 이벤트·협약 기사가 업무 term을
+  // 담고 있어도 담당자가 봐야 할 뉴스가 아니다. 예외는 둘뿐:
+  // 자사(언급 전량 수집이 원칙)와 제목에 T0 근거가 있는 경우.
+  if (noiseLabels.includes("홍보·생활정보")) {
+    const t0Title = independent.some((e) => e.field === "title" && e.tier === 0);
+    if (!t0Title) {
+      for (const d of Array.from(deskSet)) if (d !== "own") deskSet.delete(d);
+    }
   }
 
   // 감점된 기사는 신선도도 빨리 소진시킨다

@@ -57,9 +57,18 @@ const normTitle = (title: string): string =>
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, "");
 
+// 제목에 흔한 채움말 — 변별력이 없어 공유 토큰으로 세지 않는다
+const TOKEN_STOP = new Set([
+  "정부", "발표", "검토", "추진", "강화", "확대", "방안", "대책", "계획",
+  "전망", "우려", "논란", "국내", "올해", "내년", "지난해", "오늘", "이번",
+  "관련", "최대", "역대", "돌파", "급증", "급감", "단독", "속보", "종합",
+]);
+
 /**
- * 사건을 특정하는 "변별 토큰" — 숫자를 포함한 토큰(540억, 2.1억)과 3자 이상 단어.
+ * 사건을 특정하는 "변별 토큰" — 숫자를 포함한 토큰(540억, 2.1억)과 2자 이상 단어.
  * 같은 사건 보도는 표현이 달라도 이 토큰들을 공유한다.
+ * (3자 이상만 세면 유출·해킹·부과·티빙처럼 사건을 특정하는 2자 한자어가
+ *  전부 빠져 "KT 540억 과징금" 보도들이 서로 다른 사건으로 남았다)
  */
 function keyTokens(title: string): Set<string> {
   const raw = stripHtml(title)
@@ -83,8 +92,13 @@ function keyTokens(title: string): Set<string> {
       out.add(w);
       continue;
     }
+    // "kt새노조"·"sk하이닉스"처럼 약칭에 한글이 붙은 토큰에서 약칭을 따로 뽑는다
+    // — 이걸 놓치면 "KT새노조 539억…"과 "KT 540억 과징금"이 다른 사건이 된다
+    const prefix = w.match(/^([a-z]{2,4})[가-힣]/);
+    if (prefix) out.add(prefix[1]);
+    if (TOKEN_STOP.has(w)) continue;
     if (/\d/.test(w) && w.length >= 2) out.add(w);
-    else if (w.length >= 3) out.add(w);
+    else if (w.length >= 2) out.add(w);
   }
   return out;
 }
@@ -115,12 +129,11 @@ function sharedTokens(a: Set<string>, b: Set<string>): string[] {
 const isStrongToken = (t: string): boolean =>
   /^\d+(억|조|만)$/u.test(t) || /^[a-z]{2,4}$/.test(t);
 
-// KST 기준 날짜 버킷 — UTC로 나누면 09:00 KST 경계에서 같은 사안이 갈라진다
-function kstDayKey(pubDate: string): string {
+// KST 기준 날짜 번호 — UTC로 나누면 09:00 KST 경계에서 같은 사안이 갈라진다
+function kstDayNum(pubDate: string): number {
   const d = new Date(pubDate);
-  if (Number.isNaN(d.getTime())) return "_";
-  const kst = new Date(d.getTime() + 9 * 3_600_000);
-  return `${kst.getUTCFullYear()}-${kst.getUTCMonth()}-${kst.getUTCDate()}`;
+  if (Number.isNaN(d.getTime())) return 0;
+  return Math.floor((d.getTime() + 9 * 3_600_000) / 86_400_000);
 }
 
 const hostOfEntry = (e: ClusterInput): string =>
@@ -129,12 +142,16 @@ const hostOfEntry = (e: ClusterInput): string =>
 /**
  * 대표(medoid)와만 비교하는 단일 패스 클러스터링.
  * 단일연결 전이 병합(A~B, B~C ⇒ A~C)을 허용하지 않아 대형 오병합이 생기지 않는다.
+ *
+ * 비교 범위는 같은 KST 날짜 + 전날의 클러스터.
+ * 하루 단위로만 자르면 "심의 예고(수) → 부과(목) → 반응(금)"처럼 이어지는
+ * 사안이 날짜마다 새 대표를 만들어 같은 사건이 3~4번 노출됐다.
  */
 export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
-  // 버킷: KST 날짜별로만 비교해 비용과 오병합을 함께 줄인다
-  const buckets = new Map<string, ClusterInput[]>();
+  // 버킷: KST 날짜별. 비교는 자기 날짜와 전날까지만 — 비용과 오병합을 함께 줄인다.
+  const buckets = new Map<number, ClusterInput[]>();
   for (const it of items) {
-    const k = kstDayKey(it.pubDate);
+    const k = kstDayNum(it.pubDate);
     const arr = buckets.get(k);
     if (arr) arr.push(it);
     else buckets.set(k, [it]);
@@ -150,14 +167,20 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
   };
 
   const assignments: ClusterAssignment[] = [];
+  const clustersByDay = new Map<number, Cluster[]>();
+  // 오래된 날짜부터 처리해야 다음 날 기사가 전날 클러스터에 흡수될 수 있다
+  const days = Array.from(buckets.keys()).sort((a, b) => a - b);
 
-  for (const [, bucket] of buckets) {
-    // 최신순으로 처리해 가장 새로운 기사가 대표가 되게 한다
-    const sorted = bucket
+  for (const day of days) {
+    // 최신순으로 처리해 가장 새로운 기사가 그 날의 대표가 되게 한다
+    const sorted = buckets
+      .get(day)!
       .slice()
       .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
 
     const clusters: Cluster[] = [];
+    clustersByDay.set(day, clusters);
+    const prevDay = clustersByDay.get(day - 1) ?? [];
 
     for (const it of sorted) {
       const grams = bigrams(it.title);
@@ -166,7 +189,7 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
       const norm = normTitle(it.title);
       let placed = false;
 
-      for (const c of clusters) {
+      for (const c of [...clusters, ...prevDay]) {
         const d = dice(grams, c.repIndexTitle);
         // 제목이 완전히 같으면 무조건 같은 사안 (통신사 전재 등)
         const identical = norm.length > 0 && norm === c.repNorm;
@@ -176,23 +199,32 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
         const strong = shared.filter(isStrongToken).length;
         // 제목 표현이 크게 달라도 강한 신호가 겹치면 같은 사건으로 본다.
         // 예: "KT 500억 원대 과징금" ↔ "KT, 1만6647명 유출로 539억원 과징금"
+        // 변별 토큰 4개 이상 공유는 그 자체로 같은 사건이다
+        // ("박용갑 전세사기 연대보증 추심 중단"류의 표현 변주를 잡는다).
         const sameEvent =
           strong >= 2 ||
           (strong >= 1 && shared.length >= 3) ||
+          shared.length >= 4 ||
           (shared.length >= 2 && d >= LOOSE_THRESHOLD);
 
         if (!identical && d < SIM_THRESHOLD && !sameEvent) continue;
 
+        // 변별 신호가 아주 강하면(기업 약칭+금액 2개 이상, 또는 강신호+4토큰)
+        // term 일치까지 요구하지 않는다 — 같은 KT 과징금 사건인데 한쪽은
+        // "개인정보보호법", 한쪽은 "개인정보보호위원회"에 걸려 갈라지던 문제.
+        const certain =
+          strong >= 2 || (strong >= 1 && shared.length >= 4);
+
         // 제목이 비슷해도 업권 term을 공유하지 않으면 다른 사안으로 본다
-        if (!identical && c.repTerms.size && terms.size) {
-          let shared = false;
+        if (!identical && !certain && c.repTerms.size && terms.size) {
+          let termShared = false;
           for (const t of terms) {
             if (c.repTerms.has(t)) {
-              shared = true;
+              termShared = true;
               break;
             }
           }
-          if (!shared) continue;
+          if (!termShared) continue;
         }
         c.members.push(it);
         placed = true;
@@ -210,16 +242,29 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
         });
       }
     }
+  }
 
+  for (const clusters of clustersByDay.values()) {
     for (const c of clusters) {
       const hosts = new Set(c.members.map(hostOfEntry).filter(Boolean));
       const wireOnly =
         hosts.size > 0 && Array.from(hosts).every((h) => WIRE_HOSTS.has(h));
+      // 대표는 클러스터에서 가장 최신 기사 — 다음 날 후속 보도가 흡수되면
+      // 그 후속이 대표가 되어 목록이 항상 최신 국면을 보여준다
+      let repIdx = 0;
+      let repTime = -Infinity;
+      c.members.forEach((m, i) => {
+        const t = new Date(m.pubDate).getTime();
+        if (Number.isFinite(t) && t > repTime) {
+          repTime = t;
+          repIdx = i;
+        }
+      });
       c.members.forEach((m, i) => {
         assignments.push({
           link: m.link,
           clusterId: c.id,
-          isRep: i === 0,
+          isRep: i === repIdx,
           clusterHosts: Math.max(1, hosts.size),
           wireOnly,
         });

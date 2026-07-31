@@ -69,7 +69,12 @@ export default function NewsroomClient() {
     if (q) sp.set("q", q);
     if (general) sp.set("scope", "general");
     else if (desk) sp.set("desk", desk);
-    if (legal && !general) LEGAL_KINDS.forEach((k) => sp.append("kind", k));
+    if (legal && !general) {
+      LEGAL_KINDS.forEach((k) => sp.append("kind", k));
+      // 법·제도는 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
+      // 무관한 일반 법조 기사(하도급 과징금, 헌재 각하 등)를 거른다
+      sp.set("scope", "curated");
+    }
     return sp.toString();
   }, [q, desk, legal, general, range, sort]);
 
