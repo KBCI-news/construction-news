@@ -112,9 +112,11 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
   const deskSet = new Set<DeskId>();
   let nearCount = 0; // T0·T1 추가 매칭 수
 
-  // 데스크 태깅 근거를 모은 뒤, 충분히 강한 데스크만 붙인다.
-  // (본문에 term 하나 스친 것만으로 데스크가 붙어 무관한 기사가 섞이던 문제)
-  const deskEvidence = new Map<DeskId, number>();
+  // 데스크 태깅: 제목에 근거가 있어야 한다.
+  // (본문/요약에 term 하나 스친 것만으로 데스크가 붙어, 변호사 노쇼 기사가
+  //  "전자문서법" 한 번 언급으로 전자문서 데스크에 오르던 문제)
+  type Ev = { desk: DeskId; term: string; tier: number; field: string };
+  const evidence: Ev[] = [];
 
   for (const pt of PREPARED_TERMS) {
     const hit = findTermGuarded(hay, pt.norm);
@@ -123,15 +125,7 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
     // 감독기관명은 발신 주체 신호로만 쓴다 — 업무 근접도·데스크에 기여하지 않는다
     if (pt.authOnly) continue;
     businessTiers.push(pt.tier);
-
-    // 근거 점수: 제목이 가장 강하고, 티어가 낮을수록(업무에 가까울수록) 강하다
-    const fieldWeight =
-      hit.field === "title" ? 3 : hit.field === "description" ? 2 : 1;
-    const tierWeight = pt.tier <= 0 ? 3 : pt.tier === 1 ? 2 : 1;
-    deskEvidence.set(
-      pt.desk,
-      (deskEvidence.get(pt.desk) ?? 0) + fieldWeight * tierWeight,
-    );
+    evidence.push({ desk: pt.desk, term: pt.term, tier: pt.tier, field: hit.field });
 
     const v = TIER_VALUE[pt.tier] * hit.weight;
     if (v > bestTierValue) {
@@ -141,17 +135,30 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
     if (pt.tier <= 1) nearCount += 1;
   }
 
-  // 임계값 4 = 제목의 T1 term 1개, 또는 요약의 T0 term 1개, 또는 본문 근거 4회분.
-  // 본문에 T2 term 하나 스친 정도(1점)로는 데스크가 붙지 않는다.
-  const DESK_MIN_EVIDENCE = 4;
-  for (const [d, score] of deskEvidence) {
-    if (score >= DESK_MIN_EVIDENCE) deskSet.add(d);
+  // 포함관계인 term은 독립 근거가 아니다 ("전자문서법"이 걸리면 "전자문서"는 자동)
+  const allTerms = evidence.map((e) => e.term);
+  const independent = evidence.filter(
+    (e) => !allTerms.some((o) => o !== e.term && o.includes(e.term)),
+  );
+
+  // 1순위: 제목에 근거가 있는 데스크
+  for (const e of independent) {
+    if (e.field === "title") deskSet.add(e.desk);
   }
-  // 어느 데스크도 임계값을 넘지 못하면 가장 근거가 강한 것 하나는 살린다
-  if (deskSet.size === 0 && deskEvidence.size > 0) {
-    const best = Array.from(deskEvidence.entries()).sort((a, b) => b[1] - a[1])[0];
-    if (best[1] >= 3) deskSet.add(best[0]);
+
+  // 제목 근거가 전혀 없으면, 요약·본문 근거가 충분히 강할 때만 하나 붙인다
+  if (deskSet.size === 0) {
+    const strong = independent.filter((e) => e.tier <= 1);
+    if (strong.length >= 2 && strong.some((e) => e.tier === 0)) {
+      const byDesk = new Map<DeskId, number>();
+      for (const e of strong) {
+        byDesk.set(e.desk, (byDesk.get(e.desk) ?? 0) + (e.tier === 0 ? 3 : 2));
+      }
+      const best = Array.from(byDesk.entries()).sort((a, b) => b[1] - a[1])[0];
+      if (best) deskSet.add(best[0]);
+    }
   }
+
   const tierAxis = clamp01(bestTierValue + Math.max(0, nearCount - 1) * 0.08);
 
   // ---- W2 Vol : 보도량 (클러스터 크기가 아니라 서로 다른 매체 수) --------------

@@ -561,6 +561,10 @@ export const TERM_COLLISIONS: { term: string; voidedBy: string[] }[] = [
   { term: "기부", voidedBy: ["등기부", "기부채납", "기부채무"] },
   { term: "수상", voidedBy: ["수상한", "수상스키", "수상운송"] },
   { term: "증정", voidedBy: ["실증정"] },
+  // 법원 전자소송 근거법("민사소송 등에서의 전자문서 이용법")은
+  // 우리 사업의 전자문서법(전자문서 및 전자거래 기본법)과 다른 법이다
+  { term: "전자문서법", voidedBy: ["민사소송전자문서법", "민사소송등에서의전자문서"] },
+  { term: "전자문서", voidedBy: ["민사소송전자문서법", "민사소송등에서의전자문서"] },
 ];
 
 export const PREPARED_COLLISIONS = TERM_COLLISIONS.map((c) => ({
