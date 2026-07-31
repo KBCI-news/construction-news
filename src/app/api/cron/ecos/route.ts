@@ -39,11 +39,44 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const discover = url.searchParams.get("discover");
   const items = url.searchParams.get("items");
+  const raw = url.searchParams.get("raw");
   if (discover) {
     return NextResponse.json({ ok: true, tables: await discoverTables(discover) });
   }
   if (items) {
     return NextResponse.json({ ok: true, items: await discoverItems(items) });
+  }
+  // 다차원 표의 항목 조합 확인용 — statCode/cycle/start/end[/item1[/item2]]
+  // 항목을 안 주면 전 조합이 오므로 (코드1,코드2) 조합별 최신값을 요약한다.
+  if (raw) {
+    if (!/^[A-Za-z0-9/.]+$/.test(raw)) {
+      return NextResponse.json({ ok: false, error: "잘못된 raw 경로" });
+    }
+    const key = process.env.ECOS_API_KEY!;
+    const res = await fetch(
+      `https://ecos.bok.or.kr/api/StatisticSearch/${encodeURIComponent(key)}/json/kr/1/500/${raw}`,
+      { cache: "no-store" },
+    );
+    const json = (await res.json()) as Record<string, unknown>;
+    const rows =
+      ((json.StatisticSearch as { row?: Record<string, string>[] } | undefined)?.row ?? []);
+    const combos = new Map<string, Record<string, string>>();
+    for (const r of rows) {
+      const k = `${r.ITEM_CODE1}|${r.ITEM_CODE2 ?? ""}`;
+      combos.set(k, {
+        item1: `${r.ITEM_CODE1}=${r.ITEM_NAME1}`,
+        item2: `${r.ITEM_CODE2 ?? ""}=${r.ITEM_NAME2 ?? ""}`,
+        unit: r.UNIT_NAME ?? "",
+        lastTime: r.TIME ?? "",
+        lastValue: r.DATA_VALUE ?? "",
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      totalRows: rows.length,
+      result: (json.RESULT as unknown) ?? null,
+      combos: Array.from(combos.values()),
+    });
   }
 
   const supabase = getSupabaseAdmin();
