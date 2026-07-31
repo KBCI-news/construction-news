@@ -1,18 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/app/api/feed/route";
 import { DESKS, LEGAL_KINDS, getDesk } from "@/lib/lexicon";
 import { FeedRow } from "@/components/FeedRow";
+import { IndicatorStrip } from "@/components/IndicatorStrip";
+import { useClip } from "@/components/ClipProvider";
 
 type SortKey = "score" | "date" | "relevance";
 type RangeKey = "24h" | "7d" | "30d";
 
 const RANGE_LABEL: Record<RangeKey, string> = {
-  "24h": "24시간",
-  "7d": "7일",
-  "30d": "30일",
+  "24h": "오늘",
+  "7d": "1주",
+  "30d": "1개월",
 };
 
 const PAGE = 30;
@@ -28,16 +31,16 @@ function logSearch(query: string) {
 export default function NewsroomClient() {
   const router = useRouter();
   const params = useSearchParams();
+  const { items: clipped } = useClip();
 
   const q = params.get("q") ?? "";
   const desk = params.get("desk") ?? "";
   const legal = params.get("legal") === "1";
+  const general = params.get("scope") === "general";
   const range = (params.get("range") as RangeKey) || "7d";
   const sort = (params.get("sort") as SortKey) || (q ? "relevance" : "score");
-  const minScore = params.get("minScore") ?? "";
 
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [unscored, setUnscored] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
@@ -46,7 +49,6 @@ export default function NewsroomClient() {
 
   useEffect(() => setInput(q), [q]);
 
-  // 현재 조건을 URL에 반영한다 — 뒤로가기·공유·로고 클릭이 모두 자연스럽게 동작한다
   const setParam = useCallback(
     (patch: Record<string, string | null>) => {
       const next = new URLSearchParams(params.toString());
@@ -65,11 +67,11 @@ export default function NewsroomClient() {
     sp.set("sort", sort);
     sp.set("limit", "150");
     if (q) sp.set("q", q);
-    if (desk) sp.set("desk", desk);
-    if (minScore) sp.set("minScore", minScore);
-    if (legal) LEGAL_KINDS.forEach((k) => sp.append("kind", k));
+    if (general) sp.set("scope", "general");
+    else if (desk) sp.set("desk", desk);
+    if (legal && !general) LEGAL_KINDS.forEach((k) => sp.append("kind", k));
     return sp.toString();
-  }, [q, desk, legal, range, sort, minScore]);
+  }, [q, desk, legal, general, range, sort]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,10 +85,7 @@ export default function NewsroomClient() {
         if (!res.ok) throw new Error(json.error ?? "요청 실패");
         return json as FeedResponse;
       })
-      .then((json) => {
-        setItems(json.items ?? []);
-        setUnscored(Boolean(json.unscored));
-      })
+      .then((json) => setItems(json.items ?? []))
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "오류가 발생했습니다");
@@ -96,7 +95,6 @@ export default function NewsroomClient() {
     return () => controller.abort();
   }, [queryString]);
 
-  // "/" 로 검색창 포커스
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -124,128 +122,158 @@ export default function NewsroomClient() {
 
   const shown = items.slice(0, visible);
   const remaining = items.length - shown.length;
-  const deskInfo = desk ? getDesk(desk) : undefined;
+  const deskInfo = desk && !general ? getDesk(desk) : undefined;
+
+  const heading = q
+    ? `"${q}" 검색 결과`
+    : general
+      ? "일반 뉴스"
+      : legal
+        ? "법·제도"
+        : deskInfo
+          ? deskInfo.label
+          : "업무 관련 뉴스";
 
   return (
-    <div className="space-y-5">
-      {/* 검색 */}
-      <form onSubmit={submitSearch} className="card flex items-center px-3">
-        <svg
-          className="pointer-events-none h-5 w-5 shrink-0 text-gray-500"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-          aria-hidden
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+    <div className="space-y-4">
+      {/* 검색 + 브리핑 진입 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <form onSubmit={submitSearch} className="card flex flex-1 items-center px-3">
+          <svg
+            className="pointer-events-none h-5 w-5 shrink-0 text-gray-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+            />
+          </svg>
+          <input
+            ref={inputRef}
+            type="search"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            aria-label="뉴스 검색"
+            placeholder="키워드 검색  ( / )"
+            className="min-h-[52px] w-full bg-transparent px-3 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500 sm:text-[17px]"
           />
-        </svg>
-        <input
-          ref={inputRef}
-          type="search"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          aria-label="뉴스 검색"
-          placeholder="키워드 검색  ( / )"
-          className="min-h-[52px] w-full bg-transparent px-3 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500 sm:text-[17px]"
-        />
-        <button
-          type="submit"
-          className="min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-700 hover:text-[#7A5E08]"
+          <button
+            type="submit"
+            className="min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-700 hover:text-[#7A5E08]"
+          >
+            검색
+          </button>
+        </form>
+
+        {/* 브리핑은 이 사이트의 최종 산출물 — 항상 눈에 띄는 자리에 둔다 */}
+        <Link
+          href="/brief"
+          className="inline-flex min-h-[52px] shrink-0 items-center justify-center gap-2 rounded-[18px] bg-gray-900 px-5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-black"
         >
-          검색
-        </button>
-      </form>
-
-      {/* 데스크 필터 */}
-      <nav aria-label="데스크 필터" className="-mx-1 overflow-x-auto px-1 pb-1">
-        <ul className="flex items-center gap-2">
-          {[
-            { id: "", label: "전체" },
-            { id: "__legal__", label: "법·제도" },
-            ...DESKS.map((d) => ({ id: d.id, label: d.label })),
-          ].map((chip) => {
-            const active =
-              chip.id === "__legal__" ? legal : !legal && desk === chip.id;
-            return (
-              <li key={chip.id || "all"}>
-                <button
-                  onClick={() =>
-                    chip.id === "__legal__"
-                      ? setParam({ legal: legal ? null : "1", desk: null })
-                      : setParam({ desk: chip.id || null, legal: null })
-                  }
-                  aria-pressed={active}
-                  className={`inline-flex min-h-[40px] shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
-                    active
-                      ? "border-gray-900 bg-gray-900 text-white"
-                      : "border-gray-300 bg-white text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* 정렬·기간·등급 */}
-      <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
-        <Control label="정렬">
-          {(
-            [
-              ["score", "중요도"],
-              ["date", "최신"],
-              ...(q ? ([["relevance", "관련도"]] as [SortKey, string][]) : []),
-            ] as [SortKey, string][]
-          ).map(([key, label]) => (
-            <Toggle
-              key={key}
-              active={sort === key}
-              onClick={() => setParam({ sort: key })}
-            >
-              {label}
-            </Toggle>
-          ))}
-        </Control>
-        <Control label="기간">
-          {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
-            <Toggle key={r} active={range === r} onClick={() => setParam({ range: r })}>
-              {RANGE_LABEL[r]}
-            </Toggle>
-          ))}
-        </Control>
-        <Control label="등급">
-          <Toggle active={!minScore} onClick={() => setParam({ minScore: null })}>
-            전체
-          </Toggle>
-          <Toggle active={minScore === "55"} onClick={() => setParam({ minScore: "55" })}>
-            중요 이상
-          </Toggle>
-          <Toggle active={minScore === "72"} onClick={() => setParam({ minScore: "72" })}>
-            필수확인
-          </Toggle>
-        </Control>
+          🖨 브리핑 만들기
+          {clipped.length > 0 && (
+            <span className="rounded-full bg-[#FFB81C] px-2 py-0.5 text-[12px] font-extrabold tabular-nums text-gray-900">
+              {clipped.length}
+            </span>
+          )}
+        </Link>
       </div>
 
-      {deskInfo && (
-        <p className="px-1 text-[13px] text-gray-600">
-          <span className="font-bold text-gray-900">{deskInfo.label}</span> —{" "}
-          {deskInfo.definition}
-        </p>
+      <IndicatorStrip />
+
+      {/* 1단계: 무엇을 볼 것인가 (업무 관련 / 일반) */}
+      <div className="card overflow-hidden p-1.5">
+        <div
+          role="tablist"
+          aria-label="뉴스 범위"
+          className="grid grid-cols-2 gap-1.5"
+        >
+          <TabButton
+            active={!general}
+            onClick={() => setParam({ scope: null })}
+            label="업무 관련 뉴스"
+            hint="우리 업권 사전에 걸린 기사"
+          />
+          <TabButton
+            active={general}
+            onClick={() => setParam({ scope: "general", desk: null, legal: null })}
+            label="일반 뉴스"
+            hint="그 외 전체 수집 기사"
+          />
+        </div>
+      </div>
+
+      {/* 2단계: 주제 (업무 관련일 때만) */}
+      {!general && (
+        <div className="card p-3 sm:p-4">
+          <p className="mb-2 text-[11.5px] font-bold tracking-wide text-gray-500">
+            주제
+          </p>
+          <ul className="flex flex-wrap gap-1.5">
+            {[
+              { id: "", label: "전체" },
+              { id: "__legal__", label: "법·제도" },
+              ...DESKS.map((d) => ({ id: d.id, label: d.label })),
+            ].map((chip) => {
+              const active =
+                chip.id === "__legal__" ? legal : !legal && desk === chip.id;
+              return (
+                <li key={chip.id || "all"}>
+                  <button
+                    onClick={() =>
+                      chip.id === "__legal__"
+                        ? setParam({ legal: legal ? null : "1", desk: null })
+                        : setParam({ desk: chip.id || null, legal: null })
+                    }
+                    aria-pressed={active}
+                    className={`inline-flex min-h-[38px] items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
+                      active
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {deskInfo && (
+            <p className="mt-2.5 text-[12.5px] text-gray-600">
+              {deskInfo.definition}
+            </p>
+          )}
+        </div>
       )}
 
-      {unscored && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
-          아직 중요도 채점이 실행되지 않아 최신순으로 표시합니다. 수집 주기가
-          한 번 돌면 등급과 근거가 표시됩니다.
-        </p>
-      )}
+      {/* 3단계: 기간·정렬 */}
+      <div className="card flex flex-wrap items-center gap-x-6 gap-y-3 p-3 sm:p-4">
+        <Group label="기간">
+          {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
+            <Seg key={r} active={range === r} onClick={() => setParam({ range: r })}>
+              {RANGE_LABEL[r]}
+            </Seg>
+          ))}
+        </Group>
+        <Group label="정렬">
+          {(
+            [
+              ["score", "중요도순"],
+              ["date", "최신순"],
+              ...(q ? ([["relevance", "관련도순"]] as [SortKey, string][]) : []),
+            ] as [SortKey, string][]
+          ).map(([key, label]) => (
+            <Seg key={key} active={sort === key} onClick={() => setParam({ sort: key })}>
+              {label}
+            </Seg>
+          ))}
+        </Group>
+      </div>
 
       {error && (
         <div role="alert" className="rounded-lg border-l-4 border-rose-600 bg-rose-50 p-4">
@@ -259,11 +287,10 @@ export default function NewsroomClient() {
         </div>
       )}
 
-      {/* 피드 — 홈의 유일한 목록. 같은 기사가 여러 섹션에 중복 노출되지 않는다. */}
       <section className="card p-4 sm:p-6">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="accent-bar flex items-center text-[19px] font-extrabold tracking-tight text-gray-900">
-            {q ? `"${q}" 검색 결과` : desk ? getDesk(desk)?.label : legal ? "법·제도" : "뉴스룸"}
+            {heading}
           </h1>
           <p className="text-[12.5px] text-gray-600" aria-live="polite">
             {loading
@@ -282,14 +309,12 @@ export default function NewsroomClient() {
           <Skeleton />
         ) : items.length === 0 ? (
           <div className="py-14 text-center">
-            <p className="text-[14px] text-gray-600">
-              조건에 맞는 기사가 없습니다.
-            </p>
+            <p className="text-[14px] text-gray-600">조건에 맞는 기사가 없습니다.</p>
             <button
-              onClick={() => setParam({ desk: null, legal: null, minScore: null, range: "30d" })}
+              onClick={() => setParam({ desk: null, legal: null, range: "30d" })}
               className="mt-3 min-h-[44px] rounded-lg border border-gray-300 px-4 text-[13px] font-bold text-gray-700"
             >
-              조건 넓히기 (30일·전체)
+              조건 넓히기 (1개월 · 전체 주제)
             </button>
           </div>
         ) : (
@@ -305,7 +330,10 @@ export default function NewsroomClient() {
                   onClick={() => setVisible((v) => v + PAGE)}
                   className="inline-flex min-h-[44px] items-center rounded-full border border-gray-300 bg-white px-6 text-[14px] font-bold text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
                 >
-                  더 보기 <span className="ml-1.5 text-[12px] text-gray-500">+{Math.min(PAGE, remaining)}</span>
+                  더 보기
+                  <span className="ml-1.5 text-[12px] text-gray-500">
+                    +{Math.min(PAGE, remaining)}
+                  </span>
                 </button>
               </div>
             )}
@@ -316,16 +344,50 @@ export default function NewsroomClient() {
   );
 }
 
-function Control({ label, children }: { label: string; children: React.ReactNode }) {
+function TabButton({
+  active,
+  onClick,
+  label,
+  hint,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  hint: string;
+}) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[12px] font-bold tracking-wide text-gray-500">{label}</span>
-      <div className="flex items-center gap-1">{children}</div>
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`rounded-[13px] px-4 py-2.5 text-left transition-colors ${
+        active ? "bg-gray-900 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
+      }`}
+    >
+      <span className="block text-[15px] font-bold">{label}</span>
+      <span
+        className={`mt-0.5 block text-[11.5px] ${active ? "text-white/75" : "text-gray-500"}`}
+      >
+        {hint}
+      </span>
+    </button>
+  );
+}
+
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="text-[11.5px] font-bold tracking-wide text-gray-500">
+        {label}
+      </span>
+      <div className="inline-flex overflow-hidden rounded-lg border border-gray-300">
+        {children}
+      </div>
     </div>
   );
 }
 
-function Toggle({
+function Seg({
   active,
   onClick,
   children,
@@ -338,8 +400,8 @@ function Toggle({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-[36px] rounded-md px-2.5 text-[13px] font-bold transition-colors ${
-        active ? "bg-gray-900 text-white" : "text-gray-600 hover:text-gray-900"
+      className={`min-h-[40px] border-l border-gray-300 px-3.5 text-[13.5px] font-bold transition-colors first:border-l-0 ${
+        active ? "bg-gray-900 text-white" : "bg-white text-gray-600 hover:text-gray-900"
       }`}
     >
       {children}

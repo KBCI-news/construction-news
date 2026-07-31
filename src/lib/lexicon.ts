@@ -53,7 +53,7 @@ export const DESKS: Desk[] = [
   {
     id: "edoc",
     label: "전자문서",
-    definition: "공인전자문서 사업, 전자금융·보안 규제",
+    definition: "문서 전자화·스캔·보관, 전자계약·전자결재, 공인전자문서",
     className: "text-blue-700",
   },
   {
@@ -65,7 +65,7 @@ export const DESKS: Desk[] = [
   {
     id: "peers",
     label: "경쟁사",
-    definition: "신용정보사·F&I·CB·협회 동향",
+    definition: "신용정보사·F&I·CB 등 동종업계 동향",
     className: "text-slate-700",
   },
   {
@@ -273,15 +273,23 @@ export const TERMS: Term[] = [
   t("전자서명인증사업자", 1, "edoc"),
   t("온라인 송달", 1, "edoc"),
   t("전자소송", 1, "edoc"),
-  t("전자계약", 1, "edoc"),
+  t("전자계약", 1, "edoc", true),
   t("타임스탬프", 1, "edoc"),
-  t("망분리", 2, "edoc"),
-  t("금융 클라우드", 2, "edoc"),
+  // 실제 사업 영역: 종이문서 전자화·스캔·보관·전자결재
+  t("문서 전자화", 0, "edoc", true),
+  t("종이문서", 1, "edoc", true),
+  t("전자결재", 1, "edoc", true),
+  t("문서보관", 1, "edoc", true),
+  t("기록물관리", 1, "edoc", true),
+  t("스캔본", 1, "edoc"),
+  t("신뢰스캔", 1, "edoc"),
+  t("전자화 대상문서", 1, "edoc"),
+  t("문서 보존", 1, "edoc"),
+  t("보존연한", 1, "edoc"),
+  t("원본대조", 1, "edoc"),
+  t("문서 파기", 1, "edoc"),
+  t("전자문서 유통", 1, "edoc"),
   t("전자문서산업", 2, "edoc"),
-  t("핀테크", 2, "edoc"),
-  t("AI 금융", 2, "edoc"),
-  t("클라우드 보안", 2, "edoc"),
-  t("데이터산업", 2, "edoc"),
 
   // --- own : KB·자사 ---
   t("KB신용정보", 0, "own", true),
@@ -318,11 +326,6 @@ export const TERMS: Term[] = [
   t("코리아크레딧뷰로", 1, "peers"),
   t("KCB", 1, "peers"),
   t("한국기업데이터", 1, "peers"),
-  t("신용정보협회", 1, "peers"),
-  t("여신금융협회", 1, "peers"),
-  t("은행연합회", 1, "peers"),
-  t("저축은행중앙회", 1, "peers"),
-  t("대부금융협회", 1, "peers"),
 
   // --- labor : 노동 ---
   t("근로기준법", 1, "labor", true),

@@ -119,7 +119,12 @@ export default function BriefClient() {
                 <p className="text-[15px] font-bold leading-snug text-gray-900">
                   {a.title}
                 </p>
-                <p className="mt-0.5 text-[12px] text-gray-600">
+                {a.summary && (
+                  <p className="mt-1 line-clamp-2 text-[12.5px] leading-relaxed text-gray-600">
+                    {a.summary}
+                  </p>
+                )}
+                <p className="mt-1 text-[12px] text-gray-500">
                   {a.sourceHost ?? hostOf(a.link)}
                 </p>
                 <input
@@ -179,7 +184,8 @@ export default function BriefClient() {
         <ol className="mt-5">
           {items.map((a, i) => {
             const d = details[a.link];
-            const summary = d?.description ? stripHtml(d.description) : "";
+            const summary = (a.summary ?? "").trim() ||
+              (d?.description ? stripHtml(d.description) : "");
             const note = (notes[a.link] ?? "").trim();
             return (
               <li key={a.link} className="brief-item">
@@ -198,8 +204,8 @@ export default function BriefClient() {
                 )}
                 {summary && (
                   <p className="mt-1.5 text-[12.5px] leading-relaxed text-gray-700">
-                    {summary.slice(0, 180)}
-                    {summary.length > 180 ? "…" : ""}
+                    {summary.slice(0, 200)}
+                    {summary.length > 200 ? "…" : ""}
                   </p>
                 )}
                 <p className="mt-1.5 text-[11.5px] text-gray-600">

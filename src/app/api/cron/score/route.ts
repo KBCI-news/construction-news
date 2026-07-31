@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { assignClusters } from "@/lib/cluster";
 import { scoreArticle } from "@/lib/scoring";
+import { extractIndicators } from "@/lib/indicators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // 클러스터링과 채점을 서버에서 일괄 수행한다.
+// 창을 7일로 두어 '주간' 뷰가 '일간'과 같은 목록을 보여주던 문제를 없앤다.
 // (이전에는 브라우저가 매 페이지 로드마다 1000건을 O(n²)로 재계산했다)
-const WINDOW_HOURS = 72;
+const WINDOW_HOURS = 24 * 7;
 
 // PostgREST는 요청당 행 수를 1000으로 제한하므로 .limit()에 기대지 않고
 // .range()로 명시적으로 페이지를 넘긴다. (이걸 놓쳐서 14,945건 중 1,000건만
@@ -201,6 +203,33 @@ export async function GET(request: NextRequest) {
     saved += chunk.length;
   }
 
+  // ---- 4) 경제지표 추출 -------------------------------------------------------
+  // 최신 기사부터 훑어 지표별로 가장 최근 값 하나만 남긴다.
+  const found = new Map<string, { value: string; row: Row }>();
+  const scanned = [...clusterRows, ...unscored].sort(
+    (a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime(),
+  );
+  for (const r of scanned) {
+    for (const hit of extractIndicators(r.title, r.description)) {
+      if (!found.has(hit.key)) found.set(hit.key, { value: hit.value, row: r });
+    }
+  }
+  let indicatorsUpdated = 0;
+  for (const [key, { value, row }] of found) {
+    const { error: indErr } = await supabase
+      .from("indicators")
+      .update({
+        value,
+        as_of: row.pub_date,
+        source_host: row.source_host,
+        source_link: row.link,
+        source_title: row.title,
+        updated_at: new Date(now).toISOString(),
+      })
+      .eq("key", key);
+    if (!indErr) indicatorsUpdated += 1;
+  }
+
   const absorbed = rows.filter((r) => r.is_rep === false).length;
 
   return NextResponse.json({
@@ -210,5 +239,6 @@ export async function GET(request: NextRequest) {
     backfilled: unscored.length,
     saved,
     absorbed,
+    indicatorsUpdated,
   });
 }

@@ -77,6 +77,8 @@ const toItem = (r: Row): FeedItem => ({
 export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams;
   const desk = p.get("desk");
+  // scope=general : 우리 업권 사전에 걸리지 않은 '일반 뉴스'
+  const scope = p.get("scope");
   const kinds = p.getAll("kind").filter(Boolean);
   const range = RANGE_HOURS[p.get("range") ?? "7d"] ?? RANGE_HOURS["7d"];
   const q = (p.get("q") ?? "").trim();
@@ -103,6 +105,8 @@ export async function GET(request: NextRequest) {
     .gte("pub_date", since);
 
   if (desk) query = query.contains("desks", [desk]);
+  if (scope === "general") query = query.eq("desks", "{}");
+  else if (scope === "curated") query = query.neq("desks", "{}");
   if (kinds.length) query = query.overlaps("kinds", kinds);
   if (!Number.isNaN(minScore) && p.get("minScore")) {
     query = query.gte("importance", minScore);
