@@ -1,0 +1,25 @@
+name: API Probe
+
+# 배포된 크론 라우트를 수동으로 찔러보는 진단용 워크플로.
+# 컨테이너 개발 환경에서는 외부 egress가 막혀 있어, FISIS/ECOS 코드 조회
+# 같은 실호출 확인은 이 워크플로의 로그로 한다.
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "호출할 경로 (예: /api/cron/fisis?api=statisticsListSearch)"
+        required: true
+        type: string
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call endpoint
+        env:
+          PROBE_PATH: ${{ inputs.path }}
+        run: |
+          curl -fsS --max-time 90 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}${PROBE_PATH}"
