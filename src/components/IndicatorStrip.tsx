@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import type { Indicator, IndicatorPoint } from "@/app/api/indicators/route";
-import { HScroll } from "@/components/HScroll";
 
 const shortDate = (iso: string | null): string => {
   if (!iso) return "";
@@ -109,8 +108,7 @@ export function IndicatorStrip() {
         <h2 className="text-[12px] font-bold tracking-wide text-gray-600">경제지표</h2>
         <p className="text-[11px] text-gray-500">자동 수집 · 출처 표기 확인</p>
       </div>
-      <HScroll className="-mx-1 px-1 pb-1">
-      <ul className="flex gap-2">
+      <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it) => (
           <li key={it.key} className="shrink-0">
             <div className="w-[172px] rounded-xl border border-[var(--line)] px-3 py-2.5">
@@ -140,7 +138,6 @@ export function IndicatorStrip() {
           </li>
         ))}
       </ul>
-      </HScroll>
     </section>
   );
 }

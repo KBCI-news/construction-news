@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { DESKS } from "@/lib/lexicon";
-import { HScroll } from "@/components/HScroll";
 
 // public/kb-logo.png가 있으면 그 로고를, 없으면 KB 옐로우 타일로 폴백
 function BrandLogo() {
@@ -89,9 +88,7 @@ export function Header() {
           </Link>
         </div>
 
-        <nav aria-label="주요 데스크">
-          <HScroll className="pb-px">
-          <div className="flex gap-1">
+        <nav aria-label="주요 데스크" className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {items.map((item) => (
             <Link
               key={item.href}
@@ -107,8 +104,6 @@ export function Header() {
               )}
             </Link>
           ))}
-          </div>
-          </HScroll>
         </nav>
       </div>
     </header>
