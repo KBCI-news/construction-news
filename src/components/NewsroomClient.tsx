@@ -135,10 +135,10 @@ export default function NewsroomClient() {
           : "업무 관련 뉴스";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* 검색 + 브리핑 진입 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <form onSubmit={submitSearch} className="card flex flex-1 items-center px-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <form onSubmit={submitSearch} className="card flex min-w-0 flex-1 items-center px-3">
           <svg
             className="pointer-events-none h-5 w-5 shrink-0 text-gray-500"
             fill="none"
@@ -159,12 +159,12 @@ export default function NewsroomClient() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             aria-label="뉴스 검색"
-            placeholder="키워드 검색  ( / )"
-            className="min-h-[52px] w-full bg-transparent px-3 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500 sm:text-[17px]"
+            placeholder="키워드 검색"
+            className="min-h-[48px] w-full min-w-0 bg-transparent px-2.5 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500 sm:min-h-[52px] sm:px-3"
           />
           <button
             type="submit"
-            className="min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-700 hover:text-[#7A5E08]"
+            className="hidden min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-700 hover:text-[#7A5E08] sm:block"
           >
             검색
           </button>
@@ -173,11 +173,13 @@ export default function NewsroomClient() {
         {/* 브리핑은 이 사이트의 최종 산출물 — 항상 눈에 띄는 자리에 둔다 */}
         <Link
           href="/brief"
-          className="inline-flex min-h-[52px] shrink-0 items-center justify-center gap-2 rounded-[18px] bg-gray-900 px-5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-black"
+          aria-label="브리핑 만들기"
+          className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-gray-900 px-3.5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-black sm:min-h-[52px] sm:gap-2 sm:rounded-[18px] sm:px-5"
         >
-          🖨 브리핑 만들기
+          <span aria-hidden>🖨</span>
+          <span className="hidden sm:inline">브리핑 만들기</span>
           {clipped.length > 0 && (
-            <span className="rounded-full bg-[#FFB81C] px-2 py-0.5 text-[12px] font-extrabold tabular-nums text-gray-900">
+            <span className="rounded-full bg-[#FFB81C] px-1.5 py-0.5 text-[12px] font-extrabold tabular-nums text-gray-900 sm:px-2">
               {clipped.length}
             </span>
           )}
@@ -186,12 +188,12 @@ export default function NewsroomClient() {
 
       <IndicatorStrip />
 
-      {/* 1단계: 무엇을 볼 것인가 (업무 관련 / 일반) */}
-      <div className="card overflow-hidden p-1.5">
+      {/* 범위 + 주제를 한 카드로 — 모바일 세로 공간을 아낀다 */}
+      <div className="card overflow-hidden">
         <div
           role="tablist"
           aria-label="뉴스 범위"
-          className="grid grid-cols-2 gap-1.5"
+          className="grid grid-cols-2 gap-1.5 p-1.5"
         >
           <TabButton
             active={!general}
@@ -204,15 +206,10 @@ export default function NewsroomClient() {
             label="일반 뉴스"
           />
         </div>
-      </div>
 
-      {/* 2단계: 주제 (업무 관련일 때만) */}
-      {!general && (
-        <div className="card p-3 sm:p-4">
-          <p className="mb-2 text-[11.5px] font-bold tracking-wide text-gray-500">
-            주제
-          </p>
-          <ul className="flex flex-wrap gap-1.5">
+        {!general && (
+          <div className="border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
+            <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
             {[
               { id: "", label: "전체" },
               { id: "__legal__", label: "법·제도" },
@@ -221,7 +218,7 @@ export default function NewsroomClient() {
               const active =
                 chip.id === "__legal__" ? legal : !legal && desk === chip.id;
               return (
-                <li key={chip.id || "all"}>
+                <li key={chip.id || "all"} className="shrink-0">
                   <button
                     onClick={() =>
                       chip.id === "__legal__"
@@ -229,7 +226,7 @@ export default function NewsroomClient() {
                         : setParam({ desk: chip.id || null, legal: null })
                     }
                     aria-pressed={active}
-                    className={`inline-flex min-h-[38px] items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
+                    className={`inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
                       active
                         ? "border-gray-900 bg-gray-900 text-white"
                         : "border-gray-300 bg-white text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
@@ -240,17 +237,18 @@ export default function NewsroomClient() {
                 </li>
               );
             })}
-          </ul>
-          {deskInfo && (
-            <p className="mt-2.5 text-[12.5px] text-gray-600">
-              {deskInfo.definition}
-            </p>
-          )}
-        </div>
-      )}
+            </ul>
+            {deskInfo && (
+              <p className="mt-2 text-[12.5px] text-gray-600">
+                {deskInfo.definition}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 3단계: 기간·정렬 */}
-      <div className="card flex flex-wrap items-center gap-x-6 gap-y-3 p-3 sm:p-4">
+      <div className="card flex flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-2.5 sm:gap-x-6 sm:p-4">
         <Group label="기간">
           {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
             <Seg key={r} active={range === r} onClick={() => setParam({ range: r })}>

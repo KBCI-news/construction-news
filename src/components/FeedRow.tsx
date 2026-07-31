@@ -15,7 +15,7 @@ export function FeedRow({ item }: { item: FeedItem }) {
   const desk = item.desks[0];
 
   return (
-    <article className="flex items-start gap-3 overflow-hidden py-4 sm:gap-5 sm:py-5">
+    <article className="flex items-start gap-2.5 overflow-hidden py-3.5 sm:gap-5 sm:py-5">
       <div className="min-w-0 flex-1 break-words">
         {desk && (
           <p className="mb-1.5 text-[12px] font-bold tracking-wide text-[#7A5E08]">
@@ -24,7 +24,7 @@ export function FeedRow({ item }: { item: FeedItem }) {
         )}
 
         <Link href={readerHref(item.link)} className="group block">
-          <h3 className="text-[18px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[20px]">
+          <h3 className="text-[17px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[20px]">
             {title}
           </h3>
         </Link>
@@ -84,7 +84,7 @@ export function FeedRow({ item }: { item: FeedItem }) {
         <Thumbnail
           src={item.imageUrl}
           label={desk ? deskLabel(desk) : "KBCI"}
-          className="h-[60px] w-[84px] rounded-lg sm:h-[84px] sm:w-[124px]"
+          className="h-[54px] w-[74px] rounded-lg sm:h-[84px] sm:w-[124px]"
         />
       </Link>
     </article>

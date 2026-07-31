@@ -1,4 +1,5 @@
 import {
+  HEADER_TAG_RE,
   KB_TICKER_RE,
   PREPARED_ACT,
   PREPARED_AUTH,
@@ -111,6 +112,10 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
   const deskSet = new Set<DeskId>();
   let nearCount = 0; // T0·T1 추가 매칭 수
 
+  // 데스크 태깅 근거를 모은 뒤, 충분히 강한 데스크만 붙인다.
+  // (본문에 term 하나 스친 것만으로 데스크가 붙어 무관한 기사가 섞이던 문제)
+  const deskEvidence = new Map<DeskId, number>();
+
   for (const pt of PREPARED_TERMS) {
     const hit = findTermGuarded(hay, pt.norm);
     if (!hit) continue;
@@ -118,13 +123,34 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
     // 감독기관명은 발신 주체 신호로만 쓴다 — 업무 근접도·데스크에 기여하지 않는다
     if (pt.authOnly) continue;
     businessTiers.push(pt.tier);
-    deskSet.add(pt.desk);
+
+    // 근거 점수: 제목이 가장 강하고, 티어가 낮을수록(업무에 가까울수록) 강하다
+    const fieldWeight =
+      hit.field === "title" ? 3 : hit.field === "description" ? 2 : 1;
+    const tierWeight = pt.tier <= 0 ? 3 : pt.tier === 1 ? 2 : 1;
+    deskEvidence.set(
+      pt.desk,
+      (deskEvidence.get(pt.desk) ?? 0) + fieldWeight * tierWeight,
+    );
+
     const v = TIER_VALUE[pt.tier] * hit.weight;
     if (v > bestTierValue) {
       bestTierValue = v;
       bestTierTerm = { term: pt.term, tier: pt.tier, desk: pt.desk };
     }
     if (pt.tier <= 1) nearCount += 1;
+  }
+
+  // 임계값 4 = 제목의 T1 term 1개, 또는 요약의 T0 term 1개, 또는 본문 근거 4회분.
+  // 본문에 T2 term 하나 스친 정도(1점)로는 데스크가 붙지 않는다.
+  const DESK_MIN_EVIDENCE = 4;
+  for (const [d, score] of deskEvidence) {
+    if (score >= DESK_MIN_EVIDENCE) deskSet.add(d);
+  }
+  // 어느 데스크도 임계값을 넘지 못하면 가장 근거가 강한 것 하나는 살린다
+  if (deskSet.size === 0 && deskEvidence.size > 0) {
+    const best = Array.from(deskEvidence.entries()).sort((a, b) => b[1] - a[1])[0];
+    if (best[1] >= 3) deskSet.add(best[0]);
   }
   const tierAxis = clamp01(bestTierValue + Math.max(0, nearCount - 1) * 0.08);
 
@@ -180,6 +206,11 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
       penalty *= r.factor;
       noiseLabels.push(r.label);
     }
+  }
+  // 말머리는 원문 제목에서 판정 (정규화하면 "표"·"인사" 조각이 오탐한다)
+  if (HEADER_TAG_RE.test(input.title)) {
+    penalty *= 0.25;
+    noiseLabels.push("말머리");
   }
   if (KB_TICKER_RE.test(hay.title)) {
     penalty *= 0.6;

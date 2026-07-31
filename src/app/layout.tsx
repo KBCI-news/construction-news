@@ -32,7 +32,7 @@ export default function RootLayout({
           </Suspense>
           <main
             id="main-content"
-            className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-4 py-6 pb-24 sm:px-8 sm:py-9"
+            className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-3 py-4 pb-28 sm:px-8 sm:py-9"
           >
             {children}
           </main>

@@ -10,6 +10,8 @@ export type DeskId =
   | "debtor"
   | "npl"
   | "creditinfo"
+  | "survey"
+  | "lending"
   | "edoc"
   | "own"
   | "peers"
@@ -46,9 +48,21 @@ export const DESKS: Desk[] = [
   },
   {
     id: "creditinfo",
-    label: "신용정보",
-    definition: "신용조사·CB·마이데이터·개인정보 규제",
+    label: "정보보호",
+    definition: "개인(신용)정보 보호·유출·규제, 마이데이터",
     className: "text-teal-700",
+  },
+  {
+    id: "survey",
+    label: "조사",
+    definition: "신용조사·임대차조사·권리조사 등 조사 업무",
+    className: "text-cyan-800",
+  },
+  {
+    id: "lending",
+    label: "대출",
+    definition: "가계·개인사업자 대출과 여신 규제 — 추심 물량의 선행지표",
+    className: "text-indigo-700",
   },
   {
     id: "edoc",
@@ -230,7 +244,6 @@ export const TERMS: Term[] = [
 
   // --- creditinfo : 신용정보 ---
   t("신용정보법", 0, "creditinfo", true),
-  t("신용조사", 0, "creditinfo", true),
   t("신용정보업", 0, "creditinfo", true),
   t("개인정보 유출", 0, "creditinfo", true),
   t("신용정보", 1, "creditinfo", true),
@@ -249,12 +262,64 @@ export const TERMS: Term[] = [
   t("데이터전문기관", 1, "creditinfo"),
   t("데이터 결합", 1, "creditinfo"),
   t("개인신용평점", 1, "creditinfo"),
-  t("신용조회", 1, "creditinfo"),
   t("정보활용동의", 1, "creditinfo"),
   t("익명정보", 1, "creditinfo"),
   t("정보주체", 1, "creditinfo"),
   t("개인정보 과징금", 1, "creditinfo"),
   t("신용정보 유출", 1, "creditinfo"),
+
+  // --- survey : 조사 (신용조사·임대차·권리조사) ---
+  t("신용조사", 0, "survey", true),
+  t("임대차조사", 0, "survey", true),
+  t("권리조사", 0, "survey", true),
+  t("현장조사", 1, "survey", true),
+  t("임대차 실태조사", 1, "survey", true),
+  t("전세사기", 1, "survey", true),
+  t("확정일자", 1, "survey"),
+  t("전입세대열람", 1, "survey"),
+  t("등기부등본", 1, "survey"),
+  t("등기사항증명서", 1, "survey"),
+  t("근저당권", 1, "survey"),
+  t("선순위 임차인", 1, "survey"),
+  t("대항력", 1, "survey"),
+  t("우선변제권", 1, "survey"),
+  t("보증금 반환", 1, "survey"),
+  t("전세보증금", 1, "survey"),
+  t("임대차보호법", 1, "survey", true),
+  t("주택임대차", 1, "survey"),
+  t("상가임대차", 1, "survey"),
+  t("권리분석", 1, "survey"),
+  t("부동산 경매", 1, "survey"),
+  t("공매", 1, "survey"),
+  t("배당요구", 1, "survey"),
+  t("신용조회", 1, "survey"),
+  t("재산조사", 1, "survey"),
+  t("소재파악", 1, "survey"),
+
+  // --- lending : 대출·여신 (추심 물량의 선행지표) ---
+  t("가계대출", 1, "lending", true),
+  t("가계부채", 1, "lending", true),
+  t("대출규제", 1, "lending", true),
+  t("주택담보대출", 1, "lending", true),
+  t("신용대출", 1, "lending", true),
+  t("개인사업자대출", 1, "lending", true),
+  t("자영업자 대출", 1, "lending", true),
+  t("대출금리", 2, "lending", true),
+  t("DSR", 1, "lending"),
+  t("스트레스DSR", 1, "lending"),
+  t("LTV", 1, "lending"),
+  t("DTI", 1, "lending"),
+  t("여신심사", 1, "lending"),
+  t("총량규제", 1, "lending"),
+  t("정책대출", 1, "lending"),
+  t("디딤돌대출", 1, "lending"),
+  t("버팀목대출", 1, "lending"),
+  t("보금자리론", 1, "lending"),
+  t("중도상환수수료", 1, "lending"),
+  t("대환대출", 1, "lending"),
+  t("햇살론", 1, "lending"),
+  t("서민금융", 1, "lending"),
+  t("소상공인 대출", 1, "lending"),
 
   // --- edoc : 전자문서 ---
   t("공인전자문서", 0, "edoc", true),
@@ -346,19 +411,12 @@ export const TERMS: Term[] = [
 
   // --- macro : 거시 (지표 공급원. 광범위 키워드는 T2로 낮춰 노이즈를 억제) ---
   t("기준금리", 1, "macro", true),
-  t("가계대출", 1, "macro", true),
-  t("가계부채", 1, "macro", true),
-  t("대출금리", 2, "macro", true),
-  t("자영업자 대출", 2, "macro", true),
   t("금융통화위원회", 3, "macro"),
   t("금통위", 3, "macro"),
   t("소비자물가", 3, "macro"),
   t("코픽스", 3, "macro"),
-  t("DSR", 3, "macro"),
-  t("스트레스DSR", 3, "macro"),
   t("예금금리", 3, "macro"),
   t("부동산 PF", 3, "macro"),
-  t("소상공인 대출", 3, "macro"),
   t("한계기업", 3, "macro"),
   t("가계신용", 3, "macro"),
 
@@ -499,6 +557,10 @@ export const AUTH_GRADES: AuthGrade[] = [
 export const TERM_COLLISIONS: { term: string; voidedBy: string[] }[] = [
   { term: "금융위", voidedBy: ["금융위임장"] },
   { term: "발표", voidedBy: ["발표회", "신곡 발표"] },
+  // "등기부등본"이 홍보 노이즈 "기부"에 걸려 권리조사 기사가 75% 감점됐다
+  { term: "기부", voidedBy: ["등기부", "기부채납", "기부채무"] },
+  { term: "수상", voidedBy: ["수상한", "수상스키", "수상운송"] },
+  { term: "증정", voidedBy: ["실증정"] },
 ];
 
 export const PREPARED_COLLISIONS = TERM_COLLISIONS.map((c) => ({
@@ -527,14 +589,6 @@ export const NOISE_RULES: NoiseRule[] = [
     ],
   },
   {
-    factor: 0.25,
-    label: "말머리",
-    terms: [
-      "[부고]", "[인사]", "[동정]", "[포토]", "[사진]", "[영상]",
-      "[표]", "[게시판]", "[카드뉴스]",
-    ],
-  },
-  {
     factor: 0.3,
     label: "시세성",
     terms: [
@@ -555,6 +609,10 @@ export const PREPARED_NOISE = NOISE_RULES.map((r) => ({
   ...r,
   norms: r.terms.map(nfm),
 }));
+
+// 말머리 — 정규화 전 원문 제목에서만 판정한다
+export const HEADER_TAG_RE =
+  /[[【(]\s*(부고|인사|동정|포토|사진|영상|표|게시판|카드뉴스|기고|칼럼|사설)\s*[\]】)]/;
 
 // KB 계열 단순 시세 — 자사 뉴스로 오인되는 최대 노이즈원
 export const KB_TICKER_RE = /kb(금융|국민은행|국민카드).{0,12}(주가|목표주가|배당|상승|하락)/;
