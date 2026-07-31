@@ -59,35 +59,23 @@ export const ECOS_SERIES: EcosSeries[] = [
     max: 6,
   },
   // 은행대출금 연체율(1개월 이상, 금감원 기준과 동일) — 월별.
-  // 기사 추출은 금감원 발표가 있을 때만 값이 생겼지만 이 계열은 매달 채워진다.
-  // 항목 코드는 ?items=901Y124 프로브로 실측 확인했다 (202312~ 제공).
+  // 이 표는 (대출유형 MO3AA·MO3AB·MO3AC) × (은행구분 AB·DB·SB) 2차원이라
+  // 항목 두 개를 모두 고정해야 한 계열이 된다 — 하나만 주면 은행구분 3계열이
+  // 섞여 들어온다(실제로 겪은 문제). 조합은 ?raw= 프로브로 실측 확인했다.
+  // 총대출(전체) 항목1은 이 표에 없어 "은행 연체율"은 기사 추출로 남긴다.
   {
     key: "household_delinq",
     label: "가계대출 연체율",
     unit: "%",
     sortOrder: 3,
     statCode: "901Y124",
-    itemCodes: ["MO3AB"], // 가계대출
+    itemCodes: ["MO3AB", "AB"], // 가계대출 × 은행전체
     cycle: "M",
     span: 24,
-    expectName: /은행대출금 연체율[\s\S]*가계대출/,
+    expectName: /은행대출금 연체율[\s\S]*가계대출[\s\S]*은행전체/,
     expectUnit: /%/,
     min: 0.05,
     max: 15,
-  },
-  {
-    key: "bank_delinq",
-    label: "은행 연체율",
-    unit: "%",
-    sortOrder: 4,
-    statCode: "901Y124",
-    itemCodes: ["AB"], // 은행전체
-    cycle: "M",
-    span: 24,
-    expectName: /은행대출금 연체율[\s\S]*은행전체/,
-    expectUnit: /%/,
-    min: 0.05,
-    max: 10,
   },
 ];
 
