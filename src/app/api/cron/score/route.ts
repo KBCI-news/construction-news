@@ -256,6 +256,22 @@ export async function GET(request: NextRequest) {
       })
       .eq("key", key);
     if (!indErr) indicatorsUpdated += 1;
+
+    // 시계열 적재 — 같은 (지표, 시점, 값)은 중복 저장하지 않는다.
+    // 연체율은 수준보다 추이가 중요해서 이력을 남긴다.
+    const numeric = Number(value.replace(/,/g, ""));
+    if (Number.isFinite(numeric)) {
+      await supabase.from("indicator_history").upsert(
+        {
+          key,
+          value: numeric,
+          as_of: row.pub_date,
+          source_host: row.source_host,
+          source_link: row.link,
+        },
+        { onConflict: "key,as_of,value", ignoreDuplicates: true },
+      );
+    }
   }
 
   const absorbed = rows.filter((r) => r.is_rep === false).length;
