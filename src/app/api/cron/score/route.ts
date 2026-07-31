@@ -204,9 +204,35 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- 4) 경제지표 추출 -------------------------------------------------------
+  // 지표 기사는 대개 중요도가 낮아 위 두 집합에 거의 들어오지 않는다
+  // (7일간 지표 문장 4,556건 중 중요도 45↑는 31건뿐).
+  // 그래서 지표 후보만 따로, 최신순으로 조회한다.
+  let indicatorRows: Row[] = [];
+  try {
+    const { data: indData } = await supabase
+      .from("articles")
+      .select(SELECT)
+      .gte("pub_date", since)
+      .or(
+        [
+          "title.ilike.%연체율%",
+          "description.ilike.%연체율%",
+          "title.ilike.%기준금리%",
+          "description.ilike.%기준금리%",
+          "title.ilike.%환율%",
+          "description.ilike.%환율%",
+        ].join(","),
+      )
+      .order("pub_date", { ascending: false })
+      .limit(800);
+    indicatorRows = (indData ?? []) as Row[];
+  } catch {
+    indicatorRows = [];
+  }
+
   // 최신 기사부터 훑어 지표별로 가장 최근 값 하나만 남긴다.
   const found = new Map<string, { value: string; row: Row }>();
-  const scanned = [...clusterRows, ...unscored].sort(
+  const scanned = [...indicatorRows, ...clusterRows, ...unscored].sort(
     (a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime(),
   );
   for (const r of scanned) {
@@ -239,6 +265,7 @@ export async function GET(request: NextRequest) {
     backfilled: unscored.length,
     saved,
     absorbed,
+    indicatorScanned: indicatorRows.length,
     indicatorsUpdated,
   });
 }
