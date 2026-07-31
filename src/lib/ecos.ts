@@ -25,6 +25,12 @@ export type EcosSeries = {
   /** 가져올 최근 구간 길이 (cycle 단위) */
   span: number;
   /**
+   * 일별 계열을 월 1점으로 줄인다(각 달의 마지막 값).
+   * 월별 통계는 발표 시차가 있어 이번 달 결정이 늦게 반영되는데,
+   * 일별 계열을 받으면 최신값과 장기 추이를 동시에 얻는다.
+   */
+  downsample?: "month";
+  /**
    * 응답의 통계·항목명이 이 패턴과 맞아야 값을 인정한다.
    * 통계표 코드는 개편될 수 있는데, 코드만 믿고 쓰면 엉뚱한 숫자가 조용히
    * 지표로 올라간다. 이름을 함께 확인해 어긋나면 값을 버리고 보고한다.
@@ -44,8 +50,9 @@ export const ECOS_SERIES: EcosSeries[] = [
     sortOrder: 1,
     statCode: "722Y001", // 1.3.1. 한국은행 기준금리 및 여수신금리
     itemCodes: ["0101000"], // 한국은행 기준금리
-    cycle: "M",
-    span: 24, // 2년치 — 인상·인하 경로가 한눈에 보이는 최소 길이
+    cycle: "D",
+    span: 730, // 2년치 — 인상·인하 경로가 한눈에 보이는 최소 길이
+    downsample: "month",
     expectName: /기준금리/,
     expectUnit: /%/,
     min: 0.25,
@@ -207,10 +214,20 @@ export async function fetchEcosSeries(
   if (points.length === 0) return { ok: false, key: series.key, reason: "유효한 값 없음" };
 
   points.sort((a, b) => a.time.localeCompare(b.time));
+
+  // 월 1점 다운샘플 — 오름차순이므로 각 달의 마지막 값이 남고,
+  // 마지막 달의 점이 곧 최신값이 된다
+  let series_points = points;
+  if (series.downsample === "month") {
+    const byMonth = new Map<string, EcosPoint>();
+    for (const p of points) byMonth.set(p.time.slice(0, 6), p);
+    series_points = Array.from(byMonth.values());
+  }
+
   return {
     ok: true,
     key: series.key,
-    points,
+    points: series_points,
     statName: (first.STAT_NAME ?? "").trim(),
     unitName: (first.UNIT_NAME ?? "").trim(),
   };

@@ -21,13 +21,6 @@ export const maxDuration = 60;
 
 const HOST = "ecos.bok.or.kr";
 
-/** 0007 마이그레이션 이전 스키마로 물러설 때 쓰는 필드 제거 */
-const withoutSourceKind = <T extends { source_kind?: string }>(row: T) => {
-  const copy = { ...row };
-  delete copy.source_kind;
-  return copy;
-};
-
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
@@ -76,23 +69,15 @@ export async function GET(request: NextRequest) {
       source_kind: "official",
     }));
 
-    // 같은 (지표, 시점)의 공식값은 하나뿐이므로 갱신 시 덮어쓴다.
-    // 마이그레이션 0007 이전 스키마에서도 죽지 않도록 한 단계 물러선다.
-    let histErr = (
+    // 중재자는 (key, as_of, value) 전체 유니크 제약.
+    // (key, as_of) 부분 인덱스는 PostgREST upsert가 중재자로 쓸 수 없다 —
+    // 처음 그렇게 썼다가 폴백이 source_kind를 뗀 채 저장해 ECOS 점들이
+    // news로 들어갔다. 실패는 감추지 않고 report로 드러낸다.
+    const histErr = (
       await supabase
         .from("indicator_history")
-        .upsert(rows, { onConflict: "key,as_of", ignoreDuplicates: false })
+        .upsert(rows, { onConflict: "key,as_of,value", ignoreDuplicates: true })
     ).error;
-    if (histErr) {
-      histErr = (
-        await supabase
-          .from("indicator_history")
-          .upsert(rows.map(withoutSourceKind), {
-            onConflict: "key,as_of,value",
-            ignoreDuplicates: true,
-          })
-      ).error;
-    }
     if (histErr) {
       report[series.key] = `이력 적재 실패 — ${histErr.message}`;
       continue;
@@ -113,16 +98,9 @@ export async function GET(request: NextRequest) {
       source_kind: "official",
       updated_at: new Date(now).toISOString(),
     };
-    let curErr = (
+    const curErr = (
       await supabase.from("indicators").upsert(current, { onConflict: "key" })
     ).error;
-    if (curErr) {
-      curErr = (
-        await supabase
-          .from("indicators")
-          .upsert(withoutSourceKind(current), { onConflict: "key" })
-      ).error;
-    }
     if (curErr) {
       report[series.key] = `현재값 갱신 실패 — ${curErr.message}`;
       continue;
