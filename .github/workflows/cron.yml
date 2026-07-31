@@ -9,7 +9,7 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Collect articles
         run: |
@@ -23,3 +23,10 @@ jobs:
           curl -fsS --max-time 120 \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_URL }}/api/cron/score"
+
+      # 지표 시계열 — 30일 아카이브를 훑어 추이 데이터를 채운다
+      - name: Backfill indicator history
+        run: |
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}/api/cron/indicators"

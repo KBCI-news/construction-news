@@ -41,7 +41,7 @@ export async function GET() {
     .select("key,value,as_of")
     .in("key", rows.map((r) => r.key as string))
     .order("as_of", { ascending: true })
-    .limit(400);
+    .limit(1200);
 
   const byKey = new Map<string, IndicatorPoint[]>();
   for (const h of (hist ?? []) as { key: string; value: number; as_of: string }[]) {
@@ -58,7 +58,7 @@ export async function GET() {
     asOf: r.as_of,
     sourceHost: r.source_host,
     sourceLink: r.source_link,
-    history: (byKey.get(r.key as string) ?? []).slice(-12),
+    history: (byKey.get(r.key as string) ?? []).slice(-24),
   }));
 
   return NextResponse.json(
