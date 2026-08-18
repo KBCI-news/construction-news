@@ -8,6 +8,7 @@ import {
   fetchBidWindow,
   hasG2bKey,
   normalizeBid,
+  parseKst,
   probeG2b,
 } from "@/lib/g2b";
 
@@ -27,6 +28,8 @@ const MAX_WINDOW_HOURS = 24 * 30;
 //   ?probe=1          살아 있는 API 경로와 응답 원형 확인
 //   ?test=공고명      API 호출 없이 사전 판정만 확인
 //   ?hours=72         과거 소급 수집
+//   ?from=&?to=       창을 직접 지정(KST). 긴 구간은 이걸로 잘라서 돌린다
+//   ?misses=50        걸리지 않은 공고명 표본 — 사전에 뭘 더 넣을지 정할 때
 //   ?divs=용역,물품   업무구분 지정
 
 export async function GET(request: NextRequest) {
@@ -55,8 +58,19 @@ export async function GET(request: NextRequest) {
   }
 
   const hours = clamp(Number(p.get("hours") ?? DEFAULT_WINDOW_HOURS), 1, MAX_WINDOW_HOURS);
-  const to = new Date();
-  const from = new Date(to.getTime() - hours * 3_600_000);
+  const to = parseWindowParam(p.get("to")) ?? new Date();
+  const from =
+    parseWindowParam(p.get("from")) ?? new Date(to.getTime() - hours * 3_600_000);
+
+  if (from >= to) {
+    return NextResponse.json({ ok: false, error: "from이 to보다 나중입니다" }, { status: 400 });
+  }
+  if (to.getTime() - from.getTime() > MAX_WINDOW_HOURS * 3_600_000) {
+    return NextResponse.json(
+      { ok: false, error: `창이 너무 넓습니다 (최대 ${MAX_WINDOW_HOURS}시간)` },
+      { status: 400 },
+    );
+  }
 
   const divs = parseDivs(p.get("divs"));
 
@@ -65,6 +79,31 @@ export async function GET(request: NextRequest) {
       ok: true,
       window: { from: from.toISOString(), to: to.toISOString() },
       probe: await probeG2b(divs[0], from, to),
+    });
+  }
+
+  // 사전이 무엇을 놓치는지는 추측이 아니라 실물로 확인해야 한다.
+  // 걸리지 않은 공고명을 그대로 돌려주고, 눈으로 보고 사전에 반영한다.
+  const missLimit = Number(p.get("misses") ?? 0);
+  if (missLimit > 0) {
+    const misses: { div: string; title: string; clsfc: string | null }[] = [];
+    for (const div of divs) {
+      const result = await fetchBidWindow({ workDiv: div, from, to });
+      for (const raw of result.rows) {
+        const bid = normalizeBid(raw, div);
+        if (!bid || matchBid(bid.title).relevance >= BID_MIN_RELEVANCE) continue;
+        misses.push({
+          div,
+          title: bid.title,
+          clsfc: typeof raw.pubPrcrmntClsfcNm === "string" ? raw.pubPrcrmntClsfcNm : null,
+        });
+      }
+    }
+    return NextResponse.json({
+      ok: true,
+      window: { from: from.toISOString(), to: to.toISOString() },
+      total: misses.length,
+      misses: misses.slice(0, Math.min(missLimit, 300)),
     });
   }
 
@@ -172,6 +211,20 @@ export async function GET(request: NextRequest) {
     perDiv,
     ...(warnings.length ? { warnings } : {}),
   });
+}
+
+/**
+ * 창 경계 파라미터. 타임존이 붙은 ISO는 그대로 읽고, 그 외에는 KST로 읽는다
+ * (나라장터 공고 시각이 KST라 담당자가 KST로 적는 게 자연스럽다).
+ */
+function parseWindowParam(value: string | null): Date | null {
+  if (!value) return null;
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(value)) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const iso = parseKst(value);
+  return iso ? new Date(iso) : null;
 }
 
 function clamp(n: number, min: number, max: number): number {

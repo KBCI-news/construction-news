@@ -40,6 +40,9 @@ const SELECT =
   "notice_agency,demand_agency,region,presmpt_price,budget_amount," +
   "notice_dt,close_dt,opening_dt,detail_url,areas,matched_terms,relevance";
 
+/** 나라장터가 취소 차수에 붙이는 공고종류명 */
+const CANCELLED_KIND = "취소공고";
+
 const RANGE_DAYS: Record<string, number | null> = {
   "7d": 7,
   "30d": 30,
@@ -112,7 +115,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let query = supabase.from("bids").select(SELECT);
+  // 공고번호별 최신 차수만 담긴 뷰(0010). 정정·재공고로 같은 공고가
+  // 여러 줄 뜨는 것을 막는다.
+  let query = supabase.from("bids_current").select(SELECT);
 
   if (days !== null) {
     query = query.gte("notice_dt", new Date(Date.now() - days * 86_400_000).toISOString());
@@ -122,8 +127,13 @@ export async function GET(request: NextRequest) {
   const nowIso = new Date().toISOString();
   // 마감일시가 비어 오는 공고가 있다. '진행중'에서 떨구면 조용히 사라지므로
   // null은 진행중 쪽에 남겨 두고 화면에서 마감 '-'로 보이게 한다.
-  if (status === "open") query = query.or(`close_dt.gte.${nowIso},close_dt.is.null`);
-  else if (status === "closed") query = query.lt("close_dt", nowIso);
+  if (status === "open") {
+    query = query.or(`close_dt.gte.${nowIso},close_dt.is.null`);
+    // 취소된 공고는 응찰할 수 없다. 이력 확인용으로 '전체'에는 남긴다.
+    query = query.neq("notice_kind", CANCELLED_KIND);
+  } else if (status === "closed") {
+    query = query.lt("close_dt", nowIso);
+  }
 
   if (q) {
     const safe = q.replace(/[%,()]/g, " ").trim();

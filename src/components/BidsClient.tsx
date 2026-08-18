@@ -322,6 +322,18 @@ function BidRow({ bid }: { bid: BidItem }) {
         {bid.workDiv && (
           <span className="text-[11.5px] font-medium text-gray-500">{bid.workDiv}</span>
         )}
+        {/* 취소·정정은 응찰 가능 여부를 바꾸므로 제목 앞에서 먼저 읽혀야 한다 */}
+        {bid.noticeKind && bid.noticeKind !== "등록공고" && (
+          <span
+            className={`rounded px-1.5 py-0.5 text-[11.5px] font-bold ${
+              bid.noticeKind.includes("취소")
+                ? "bg-rose-100 text-rose-800"
+                : "bg-amber-100 text-amber-900"
+            }`}
+          >
+            {bid.noticeKind}
+          </span>
+        )}
         {d && (
           <span
             className={`text-[11.5px] font-bold ${
@@ -362,7 +374,8 @@ function BidRow({ bid }: { bid: BidItem }) {
         <span>마감 {formatDate(bid.closeDt)}</span>
         <span className="tabular-nums">
           공고번호 {bid.bidNo}
-          {bid.bidOrd && bid.bidOrd !== "00" ? `-${bid.bidOrd}` : ""}
+          {/* 차수는 API가 '000'/'00' 등 자리수를 섞어 준다. 0이면 최초 공고다. */}
+          {Number(bid.bidOrd) > 0 ? `-${bid.bidOrd}` : ""}
         </span>
       </div>
 
