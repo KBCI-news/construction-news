@@ -50,6 +50,7 @@ export const bidAreaLabel = (id: string): string =>
 
 /**
  * 분야별 판정 규칙.
+ *   classes — 조달청 분류명. 걸리면 weak의 context 요구를 면제한다.
  *   strong  — 단독으로 확정. 이 말이 공고명에 있으면 그 사업이다.
  *   weak    — 단독으로는 모호. context와 함께 나와야 인정한다.
  *   context — weak를 확정으로 끌어올리는 동반어.
@@ -62,6 +63,12 @@ type AreaRule = {
   weak: string[];
   context: string[];
   deny: string[];
+  /**
+   * 조달청 물품/용역 분류명. 공고명보다 훨씬 신뢰도가 높다 — 발주처가
+   * 제목을 어떻게 짓든 분류는 체계를 따르기 때문이다. 분류가 걸리면
+   * weak term의 동반어(context) 요구를 면제한다.
+   */
+  classes: string[];
 };
 
 const RULES: Record<BidAreaId, AreaRule> = {
@@ -101,6 +108,8 @@ const RULES: Record<BidAreaId, AreaRule> = {
       "3D", "3차원", "라이다", "LiDAR", "MRI", "초음파", "지문", "홍채",
       "얼굴인식", "바코드", "QR", "노면", "지하매설", "혈관", "안저",
     ],
+    // 실측 확인: '2026년 중요 비전자기록물 전산화 사업'의 중분류가 이것이다
+    classes: ["DB구축 및 자료입력"],
   },
   archive: {
     strong: [
@@ -126,6 +135,7 @@ const RULES: Record<BidAreaId, AreaRule> = {
       "종자", "탄약", "무기", "폐기물", "의료폐기물", "식품", "급식",
       "청소", "방역", "해충", "가축", "분뇨", "하수",
     ],
+    classes: [],
   },
   lease: {
     strong: [
@@ -145,6 +155,7 @@ const RULES: Record<BidAreaId, AreaRule> = {
       "분석", "컨설팅", "피해", "지원",
     ],
     deny: ["전세계", "청사", "관사", "사택", "임차료 산정", "감정평가 수수료", "임대료 인상"],
+    classes: [],
   },
   rights: {
     strong: [
@@ -170,6 +181,7 @@ const RULES: Record<BidAreaId, AreaRule> = {
       "소비자 권리", "권리금", "지장물", "재산권 보호", "권리 증진",
       "재산세 감면",
     ],
+    classes: [],
   },
 };
 
@@ -180,7 +192,10 @@ export type BidMatch = {
 };
 
 const STRONG_SCORE = 80;
+/** 분류가 받쳐주면 동반어 없이도 인정한다 — 분류는 제목보다 정직하다 */
+const CLASS_WEAK_SCORE = 65;
 const WEAK_SCORE = 50;
+const CLASS_ONLY_SCORE = 50;
 /** 이 점수 미만은 저장하지 않는다 — 표가 오탐으로 덮이면 아무도 안 본다 */
 export const BID_MIN_RELEVANCE = WEAK_SCORE;
 
@@ -217,8 +232,21 @@ function makeHas(title: string): (term: string) => boolean {
  * 공고명으로 사업 분야를 판정한다. 수요기관명은 근거로 쓰지 않는다 —
  * 기관 이름만으로 사업 성격을 단정하면 오탐이 걷잡을 수 없이 늘어난다.
  */
-export function matchBid(title: string): BidMatch {
+/** 판정에 쓰는 공고 정보. 분류명은 없을 수 있다(오퍼레이션마다 다르다). */
+export type BidSubject = {
+  title: string;
+  /** 조달청 분류명들 — 대분류·중분류·품목분류를 그대로 넘긴다 */
+  classes?: (string | null | undefined)[];
+};
+
+export function matchBid(subject: string | BidSubject): BidMatch {
+  const { title, classes = [] } =
+    typeof subject === "string" ? { title: subject, classes: [] } : subject;
+
   const has = makeHas(title);
+  const classNames = classes.filter((c): c is string => Boolean(c && c.trim()));
+  const hasClass = (name: string) =>
+    classNames.some((c) => nfm(c) === nfm(name) || nfm(c).includes(nfm(name)));
 
   const areas: BidAreaId[] = [];
   const terms = new Set<string>();
@@ -237,20 +265,38 @@ export function matchBid(title: string): BidMatch {
 
     if (rule.deny.some(has)) return;
 
+    const classHits = rule.classes.filter(hasClass);
     const weakHits = rule.weak.filter(has);
-    if (weakHits.length === 0) return;
     const contextHits = rule.context.filter(has);
-    if (contextHits.length === 0) return;
 
-    areas.push(area);
-    weakHits.forEach((t) => terms.add(t));
-    contextHits.slice(0, 3).forEach((t) => terms.add(t));
-    best = Math.max(best, WEAK_SCORE);
+    // 분류가 받쳐주면 동반어를 요구하지 않는다. 공고명이 "2026년 ○○사업"처럼
+    // 아무 정보가 없어도 분류는 체계를 따르기 때문이다.
+    if (classHits.length > 0 && weakHits.length > 0) {
+      areas.push(area);
+      weakHits.forEach((t) => terms.add(t));
+      classHits.forEach((c) => terms.add(`분류:${c}`));
+      best = Math.max(best, CLASS_WEAK_SCORE);
+      return;
+    }
+
+    if (weakHits.length > 0 && contextHits.length > 0) {
+      areas.push(area);
+      weakHits.forEach((t) => terms.add(t));
+      contextHits.slice(0, 3).forEach((t) => terms.add(t));
+      best = Math.max(best, WEAK_SCORE);
+      return;
+    }
+
+    // 분류만 걸린 건 확신이 낮지만, 놓치는 것보다는 낫다. 최소 점수로 남긴다.
+    if (classHits.length > 0) {
+      areas.push(area);
+      classHits.forEach((c) => terms.add(`분류:${c}`));
+      best = Math.max(best, CLASS_ONLY_SCORE);
+    }
   });
 
   if (areas.length === 0) return { areas: [], terms: [], relevance: 0 };
 
-  // 근거가 여러 개면 확신이 커진다. 다만 상한을 둬 100을 넘기지 않는다.
   const bonus = Math.min(20, (terms.size - 1) * 5);
   return {
     areas,
@@ -258,3 +304,4 @@ export function matchBid(title: string): BidMatch {
     relevance: Math.min(100, best + bonus),
   };
 }
+

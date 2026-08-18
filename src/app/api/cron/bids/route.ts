@@ -30,6 +30,7 @@ const MAX_WINDOW_HOURS = 24 * 30;
 //   ?hours=72         과거 소급 수집
 //   ?from=&?to=       창을 직접 지정(KST). 긴 구간은 이걸로 잘라서 돌린다
 //   ?misses=50        걸리지 않은 공고명 표본 — 사전에 뭘 더 넣을지 정할 때
+//   ?clsfc=1          조달청 분류명 빈도표 — 어느 분류를 사전에 넣을지 고를 때
 //   ?divs=용역,물품   업무구분 지정
 
 export async function GET(request: NextRequest) {
@@ -82,6 +83,30 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // 조달청 분류명은 공고명보다 정직하다. 어떤 분류가 실제로 존재하는지
+  // 세어 보고, 우리 사업에 해당하는 분류를 사전(classes)에 등록한다.
+  if (p.get("clsfc")) {
+    const tally = new Map<string, number>();
+    for (const div of divs) {
+      const result = await fetchBidWindow({ workDiv: div, from, to });
+      for (const raw of result.rows) {
+        for (const name of classesOf(raw)) {
+          const key = `${div} | ${name}`;
+          tally.set(key, (tally.get(key) ?? 0) + 1);
+        }
+      }
+    }
+    const sorted = Array.from(tally.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+    return NextResponse.json({
+      ok: true,
+      window: { from: from.toISOString(), to: to.toISOString() },
+      distinct: sorted.length,
+      classes: sorted.slice(0, 400),
+    });
+  }
+
   // 사전이 무엇을 놓치는지는 추측이 아니라 실물로 확인해야 한다.
   // 걸리지 않은 공고명을 그대로 돌려주고, 눈으로 보고 사전에 반영한다.
   const missLimit = Number(p.get("misses") ?? 0);
@@ -91,7 +116,10 @@ export async function GET(request: NextRequest) {
       const result = await fetchBidWindow({ workDiv: div, from, to });
       for (const raw of result.rows) {
         const bid = normalizeBid(raw, div);
-        if (!bid || matchBid(bid.title).relevance >= BID_MIN_RELEVANCE) continue;
+        if (!bid) continue;
+        if (matchBid({ title: bid.title, classes: classesOf(raw) }).relevance >= BID_MIN_RELEVANCE) {
+          continue;
+        }
         misses.push({
           div,
           title: bid.title,
@@ -135,7 +163,7 @@ export async function GET(request: NextRequest) {
       if (!bid) continue;
       scanned += 1;
 
-      const match = matchBid(bid.title);
+      const match = matchBid({ title: bid.title, classes: classesOf(raw) });
       if (match.relevance < BID_MIN_RELEVANCE) continue;
       divMatched += 1;
 
@@ -211,6 +239,16 @@ export async function GET(request: NextRequest) {
     perDiv,
     ...(warnings.length ? { warnings } : {}),
   });
+}
+
+/**
+ * 조달청 분류명 3단(대·중·품목)을 그대로 뽑는다. 오퍼레이션마다 채워지는
+ * 항목이 달라 있는 것만 쓴다.
+ */
+function classesOf(raw: Record<string, unknown>): string[] {
+  return ["pubPrcrmntLrgClsfcNm", "pubPrcrmntMidClsfcNm", "pubPrcrmntClsfcNm"]
+    .map((k) => raw[k])
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
 }
 
 /**
