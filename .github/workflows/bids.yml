@@ -1,0 +1,30 @@
+name: Bid Notice Cron
+
+on:
+  schedule:
+    # 1시간 간격. 정각(:00)은 GitHub Actions 큐가 가장 붐벼 수십 분씩 밀리므로
+    # 5분 뒤로 비켜 둔다. 수집 창(기본 3시간)이 지연을 흡수한다.
+    - cron: "5 * * * *"
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "소급 수집 시간(기본 3, 최대 720)"
+        required: false
+        type: string
+
+jobs:
+  bids:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # 나라장터(조달청) 입찰공고 — 문서 전자화·전자문서 보관·임대차조사·권리조사.
+      # G2B_SERVICE_KEY가 없으면 즉시 skip 응답이라 실패하지 않는다.
+      - name: Collect bid notices
+        env:
+          HOURS: ${{ inputs.hours }}
+        run: |
+          QS=""
+          if [ -n "$HOURS" ]; then QS="?hours=$HOURS"; fi
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}/api/cron/bids${QS}"
