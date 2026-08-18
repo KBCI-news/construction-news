@@ -36,6 +36,7 @@ export function Header() {
   const legal = params.get("legal") === "1";
   const general = params.get("scope") === "general";
   const onHome = pathname === "/";
+  const onBids = pathname === "/bids";
 
   const items = [
     {
@@ -56,6 +57,12 @@ export function Header() {
         active: onHome && activeDesk === id && !general,
       };
     }),
+    // 뉴스가 아니라 마감이 있는 액션 아이템이라 별도 화면을 쓴다
+    {
+      href: "/bids",
+      label: "입찰공고",
+      active: onBids,
+    },
     // 업무 데스크와 성격이 달라 맨 끝에 둔다 — 사전에 안 걸린 나머지 전부
     {
       href: "/?scope=general",
