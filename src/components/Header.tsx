@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { DESKS } from "@/lib/lexicon";
+import { usePathname } from "next/navigation";
 
 // public/kb-logo.png가 있으면 그 로고를, 없으면 KB 옐로우 타일로 폴백
 function BrandLogo() {
@@ -26,50 +25,15 @@ function BrandLogo() {
   );
 }
 
-// 상단 내비는 데스크 상위 6개 + 법·제도. 나머지 데스크는 홈의 칩 필터에 있다.
-const TOP_DESKS = ["collection", "debtor", "npl", "creditinfo", "edoc", "own"];
+// GNB는 최상위 섹션 셋만 둔다. 뉴스 주제·범위는 뉴스 화면 안의 칩이 담당한다.
+const SECTIONS = [
+  { href: "/", label: "뉴스" },
+  { href: "/indicators", label: "경제지표" },
+  { href: "/bids", label: "입찰공고" },
+];
 
 export function Header() {
   const pathname = usePathname();
-  const params = useSearchParams();
-  const activeDesk = params.get("desk") ?? "";
-  const legal = params.get("legal") === "1";
-  const general = params.get("scope") === "general";
-  const onHome = pathname === "/";
-  const onBids = pathname === "/bids";
-
-  const items = [
-    {
-      href: "/",
-      label: "전체",
-      active: onHome && !activeDesk && !legal && !general,
-    },
-    {
-      href: "/?legal=1",
-      label: "법·제도",
-      active: onHome && legal,
-    },
-    ...TOP_DESKS.map((id) => {
-      const d = DESKS.find((x) => x.id === id)!;
-      return {
-        href: `/?desk=${id}`,
-        label: d.label,
-        active: onHome && activeDesk === id && !general,
-      };
-    }),
-    // 뉴스가 아니라 마감이 있는 액션 아이템이라 별도 화면을 쓴다
-    {
-      href: "/bids",
-      label: "입찰공고",
-      active: onBids,
-    },
-    // 업무 데스크와 성격이 달라 맨 끝에 둔다 — 사전에 안 걸린 나머지 전부
-    {
-      href: "/?scope=general",
-      label: "일반 뉴스",
-      active: onHome && general,
-    },
-  ];
 
   return (
     <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/90 shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)] backdrop-blur-md">
@@ -95,22 +59,26 @@ export function Header() {
           </Link>
         </div>
 
-        <nav aria-label="주요 데스크" className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={item.active ? "page" : undefined}
-              className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
-                item.active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {item.label}
-              {item.active && (
-                <span className="absolute inset-x-2.5 -bottom-px h-[3px] rounded-full bg-[#FFB81C]" />
-              )}
-            </Link>
-          ))}
+        <nav aria-label="주요 섹션" className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {SECTIONS.map((item) => {
+            const active =
+              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
+                  active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {item.label}
+                {active && (
+                  <span className="absolute inset-x-2.5 -bottom-px h-[3px] rounded-full bg-[#FFB81C]" />
+                )}
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </header>
