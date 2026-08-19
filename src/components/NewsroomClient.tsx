@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/app/api/feed/route";
 import { DESKS, LEGAL_KINDS, getDesk } from "@/lib/lexicon";
 import { FeedRow } from "@/components/FeedRow";
-import { IndicatorStrip } from "@/components/IndicatorStrip";
 import { useClip } from "@/components/ClipProvider";
 
 type SortKey = "score" | "date" | "relevance";
@@ -143,9 +142,6 @@ export default function NewsroomClient() {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* 지표가 맨 위 — 게시판에 옮겨 적는 숫자라 열자마자 보여야 한다 */}
-      <IndicatorStrip />
-
       {/* 검색 + 브리핑 진입 */}
       <div className="flex items-center gap-2 sm:gap-3">
         <form onSubmit={submitSearch} className="card flex min-w-0 flex-1 items-center px-3">
@@ -196,25 +192,31 @@ export default function NewsroomClient() {
         </Link>
       </div>
 
-      {/* 주제 칩 — 일반 뉴스는 GNB에서 진입하므로 여기서는 범위 탭을 두지 않는다 */}
-      {!general && (
-        <div className="card overflow-hidden">
-          <div className="px-3 py-2.5 sm:px-4">
-            <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
+      {/* 주제 칩 — GNB는 섹션 전용이므로 뉴스 범위·주제는 전부 여기서 고른다 */}
+      <div className="card overflow-hidden">
+        <div className="px-3 py-2.5 sm:px-4">
+          <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
             {[
               { id: "", label: "전체" },
               { id: "__legal__", label: "법·제도" },
               ...DESKS.map((d) => ({ id: d.id, label: d.label })),
+              { id: "__general__", label: "일반 뉴스" },
             ].map((chip) => {
               const active =
-                chip.id === "__legal__" ? legal : !legal && desk === chip.id;
+                chip.id === "__legal__"
+                  ? legal
+                  : chip.id === "__general__"
+                    ? general
+                    : !legal && !general && desk === chip.id;
               return (
                 <li key={chip.id || "all"} className="shrink-0">
                   <button
                     onClick={() =>
                       chip.id === "__legal__"
-                        ? setParam({ legal: legal ? null : "1", desk: null })
-                        : setParam({ desk: chip.id || null, legal: null })
+                        ? setParam({ legal: legal ? null : "1", desk: null, scope: null })
+                        : chip.id === "__general__"
+                          ? setParam({ scope: general ? null : "general", desk: null, legal: null })
+                          : setParam({ desk: chip.id || null, legal: null, scope: null })
                     }
                     aria-pressed={active}
                     className={`inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
@@ -234,9 +236,8 @@ export default function NewsroomClient() {
                 {deskInfo.definition}
               </p>
             )}
-          </div>
         </div>
-      )}
+      </div>
 
       {/* 3단계: 기간·정렬 */}
       <div className="card flex flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-2.5 sm:gap-x-6 sm:p-4">
