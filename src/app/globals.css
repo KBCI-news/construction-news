@@ -123,6 +123,25 @@ body {
     background: var(--kb);
     transform: translateY(1px);
   }
+
+  /* 필터 칩 — 테두리 대신 면으로. 켜진 것 하나만 진하게 드러난다. */
+  .chip {
+    @apply inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full bg-gray-100 px-3.5 text-[13.5px] font-bold text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900;
+  }
+  .chip-on {
+    @apply bg-gray-900 text-white hover:bg-gray-900 hover:text-white;
+  }
+
+  /* 세그먼트 컨트롤 — 홈이 파인 트랙 위에 선택만 흰 면으로 떠오른다 */
+  .seg-group {
+    @apply inline-flex items-center rounded-[11px] bg-gray-100 p-[3px];
+  }
+  .seg {
+    @apply min-h-[36px] rounded-[9px] px-3.5 text-[13px] font-bold text-gray-500 transition-colors hover:text-gray-900;
+  }
+  .seg-on {
+    @apply bg-white text-gray-900 shadow-sm hover:text-gray-900;
+  }
 }
 
 @layer utilities {
