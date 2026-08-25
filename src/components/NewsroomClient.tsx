@@ -142,59 +142,59 @@ export default function NewsroomClient() {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* 검색 + 브리핑 진입 */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        <form onSubmit={submitSearch} className="card flex min-w-0 flex-1 items-center px-3">
-          <svg
-            className="pointer-events-none h-5 w-5 shrink-0 text-gray-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            aria-hidden
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-            />
-          </svg>
-          <input
-            ref={inputRef}
-            type="search"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            aria-label="뉴스 검색"
-            placeholder="키워드 검색"
-            className="min-h-[48px] w-full min-w-0 bg-transparent px-2.5 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500 sm:min-h-[52px] sm:px-3"
-          />
-          <button
-            type="submit"
-            className="hidden min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-700 hover:text-[#7A5E08] sm:block"
-          >
-            검색
-          </button>
-        </form>
-
-        {/* 브리핑은 이 사이트의 최종 산출물 — 항상 눈에 띄는 자리에 둔다 */}
-        <Link
-          href="/brief"
-          aria-label="브리핑 만들기"
-          className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-gray-900 px-3.5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-black sm:min-h-[52px] sm:gap-2 sm:rounded-[18px] sm:px-5"
-        >
-          <span aria-hidden>🖨</span>
-          <span className="hidden sm:inline">브리핑 만들기</span>
-          {clipped.length > 0 && (
-            <span className="rounded-full bg-[#FFB81C] px-1.5 py-0.5 text-[12px] font-extrabold tabular-nums text-gray-900 sm:px-2">
-              {clipped.length}
-            </span>
-          )}
-        </Link>
-      </div>
-
-      {/* 주제 칩 — GNB는 섹션 전용이므로 뉴스 범위·주제는 전부 여기서 고른다 */}
+      {/* 툴바 — 검색·주제·기간·정렬을 카드 하나에 층으로 쌓는다.
+          컨트롤이 카드 세 장으로 흩어져 있던 것이 화면을 번잡하게 했다. */}
       <div className="card overflow-hidden">
-        <div className="px-3 py-2.5 sm:px-4">
+        <div className="flex items-center gap-2 p-2 pl-3 sm:gap-3 sm:p-2.5 sm:pl-4">
+          <form onSubmit={submitSearch} className="flex min-w-0 flex-1 items-center">
+            <svg
+              className="pointer-events-none h-5 w-5 shrink-0 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+              />
+            </svg>
+            <input
+              ref={inputRef}
+              type="search"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              aria-label="뉴스 검색"
+              placeholder="키워드 검색"
+              className="min-h-[48px] w-full min-w-0 bg-transparent px-2.5 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-400 sm:px-3"
+            />
+            <button
+              type="submit"
+              className="hidden min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-600 hover:text-[#7A5E08] sm:block"
+            >
+              검색
+            </button>
+          </form>
+
+          {/* 브리핑은 이 사이트의 최종 산출물 — 항상 눈에 띄는 자리에 둔다 */}
+          <Link
+            href="/brief"
+            aria-label="브리핑 만들기"
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gray-900 px-3.5 text-[14.5px] font-bold text-white transition-colors hover:bg-black sm:gap-2 sm:px-4"
+          >
+            <span aria-hidden>🖨</span>
+            <span className="hidden sm:inline">브리핑 만들기</span>
+            {clipped.length > 0 && (
+              <span className="rounded-full bg-[#FFB81C] px-1.5 py-0.5 text-[12px] font-extrabold tabular-nums text-gray-900 sm:px-2">
+                {clipped.length}
+              </span>
+            )}
+          </Link>
+        </div>
+
+        <div className="border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
           <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
             {[
               { id: "", label: "전체" },
@@ -219,48 +219,41 @@ export default function NewsroomClient() {
                           : setParam({ desk: chip.id || null, legal: null, scope: null })
                     }
                     aria-pressed={active}
-                    className={`inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
-                      active
-                        ? "border-gray-900 bg-gray-900 text-white"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
-                    }`}
+                    className={`chip ${active ? "chip-on" : ""}`}
                   >
                     {chip.label}
                   </button>
                 </li>
               );
             })}
-            </ul>
-            {deskInfo && (
-              <p className="mt-2 text-[12.5px] text-gray-600">
-                {deskInfo.definition}
-              </p>
-            )}
+          </ul>
+          {deskInfo && (
+            <p className="mt-2 text-[12.5px] text-gray-500">{deskInfo.definition}</p>
+          )}
         </div>
-      </div>
 
-      {/* 3단계: 기간·정렬 */}
-      <div className="card flex flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-2.5 sm:gap-x-6 sm:p-4">
-        <Group label="기간">
-          {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
-            <Seg key={r} active={range === r} onClick={() => setParam({ range: r })}>
-              {RANGE_LABEL[r]}
-            </Seg>
-          ))}
-        </Group>
-        <Group label="정렬">
-          {(
-            [
-              ["score", "중요도순"],
-              ["date", "최신순"],
-              ...(q ? ([["relevance", "관련도순"]] as [SortKey, string][]) : []),
-            ] as [SortKey, string][]
-          ).map(([key, label]) => (
-            <Seg key={key} active={sort === key} onClick={() => setParam({ sort: key })}>
-              {label}
-            </Seg>
-          ))}
-        </Group>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--line)] px-3 py-2 sm:gap-x-6 sm:px-4">
+          <Group label="기간">
+            {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
+              <Seg key={r} active={range === r} onClick={() => setParam({ range: r })}>
+                {RANGE_LABEL[r]}
+              </Seg>
+            ))}
+          </Group>
+          <Group label="정렬">
+            {(
+              [
+                ["score", "중요도순"],
+                ["date", "최신순"],
+                ...(q ? ([["relevance", "관련도순"]] as [SortKey, string][]) : []),
+              ] as [SortKey, string][]
+            ).map(([key, label]) => (
+              <Seg key={key} active={sort === key} onClick={() => setParam({ sort: key })}>
+                {label}
+              </Seg>
+            ))}
+          </Group>
+        </div>
       </div>
 
       {error && (
@@ -300,14 +293,14 @@ export default function NewsroomClient() {
             <p className="text-[14px] text-gray-600">조건에 맞는 기사가 없습니다.</p>
             <button
               onClick={() => setParam({ desk: null, legal: null, range: null })}
-              className="mt-3 min-h-[44px] rounded-lg border border-gray-300 px-4 text-[13px] font-bold text-gray-700"
+              className="mt-3 min-h-[44px] rounded-full bg-gray-100 px-5 text-[13px] font-bold text-gray-700 transition-colors hover:bg-gray-200"
             >
               조건 넓히기 (전체 기간 · 전체 주제)
             </button>
           </div>
         ) : (
           <>
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-[var(--line)]">
               {shown.map((item) => (
                 <FeedRow key={item.link} item={item} />
               ))}
@@ -316,7 +309,7 @@ export default function NewsroomClient() {
               <div className="mt-5 text-center">
                 <button
                   onClick={() => setVisible((v) => v + PAGE)}
-                  className="inline-flex min-h-[44px] items-center rounded-full border border-gray-300 bg-white px-6 text-[14px] font-bold text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
+                  className="inline-flex min-h-[44px] items-center rounded-full bg-gray-100 px-6 text-[14px] font-bold text-gray-700 transition-colors hover:bg-gray-200"
                 >
                   더 보기
                   <span className="ml-1.5 text-[12px] text-gray-500">
@@ -338,9 +331,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-[11.5px] font-bold tracking-wide text-gray-500">
         {label}
       </span>
-      <div className="inline-flex overflow-hidden rounded-lg border border-gray-300">
-        {children}
-      </div>
+      <div className="seg-group">{children}</div>
     </div>
   );
 }
@@ -358,9 +349,7 @@ function Seg({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-[40px] border-l border-gray-300 px-3.5 text-[13.5px] font-bold transition-colors first:border-l-0 ${
-        active ? "bg-gray-900 text-white" : "bg-white text-gray-600 hover:text-gray-900"
-      }`}
+      className={`seg ${active ? "seg-on" : ""}`}
     >
       {children}
     </button>
@@ -369,7 +358,7 @@ function Seg({
 
 function Skeleton() {
   return (
-    <div className="divide-y divide-gray-200">
+    <div className="divide-y divide-[var(--line)]">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-start gap-3 py-5 sm:gap-5">
           <div className="min-w-0 flex-1">

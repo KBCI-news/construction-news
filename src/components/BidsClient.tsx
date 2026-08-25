@@ -138,27 +138,6 @@ export default function BidsClient() {
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      <section className="card p-4 sm:p-5">
-        <h1 className="accent-bar flex items-center text-[19px] font-extrabold tracking-tight text-gray-900">
-          입찰공고
-        </h1>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-gray-600">
-          나라장터(조달청) 공고를 1시간마다 확인해 문서 전자화·전자문서 보관·
-          임대차조사·권리조사에 해당하는 건만 모읍니다. 판정은 공고명 키워드
-          기준이라 최종 확인은 반드시 원문 공고로 하세요.
-        </p>
-        <p className="mt-2 text-[12.5px] text-gray-500" aria-live="polite">
-          {data?.lastRun
-            ? `마지막 확인 ${formatRelative(data.lastRun.ranAt)}${
-                data.lastRun.ok ? "" : " · 경고 있음"
-              }`
-            : "아직 수집 기록이 없습니다"}
-          {data?.lastRun && !data.lastRun.ok && data.lastRun.detail && (
-            <span className="ml-1 text-rose-700">— {data.lastRun.detail}</span>
-          )}
-        </p>
-      </section>
-
       {data && !data.ready && (
         <div role="alert" className="card border-l-4 border-amber-500 p-4">
           <p className="text-[14px] font-bold text-gray-900">
@@ -172,8 +151,46 @@ export default function BidsClient() {
         </div>
       )}
 
+      {/* 툴바 — 검색·분야·상태·정렬을 카드 하나에 층으로 쌓는다 */}
       <div className="card overflow-hidden">
-        <div className="px-3 py-2.5 sm:px-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setParam({ q: input.trim() || null });
+          }}
+          className="flex items-center px-3 sm:px-4"
+        >
+          <svg
+            className="pointer-events-none h-5 w-5 shrink-0 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+            />
+          </svg>
+          <input
+            type="search"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            aria-label="공고 검색"
+            placeholder="공고명·수요기관 검색"
+            className="min-h-[48px] w-full min-w-0 bg-transparent px-2.5 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-400 sm:px-3"
+          />
+          <button
+            type="submit"
+            className="min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-600 hover:text-[#7A5E08]"
+          >
+            검색
+          </button>
+        </form>
+
+        <div className="border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
           <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
             {[{ id: "", label: "전체" }, ...BID_AREAS.map((a) => ({ id: a.id, label: a.label }))].map(
               (chip) => {
@@ -183,11 +200,7 @@ export default function BidsClient() {
                     <button
                       onClick={() => setParam({ area: chip.id || null })}
                       aria-pressed={active}
-                      className={`inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-bold transition-colors ${
-                        active
-                          ? "border-gray-900 bg-gray-900 text-white"
-                          : "border-gray-300 bg-white text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
-                      }`}
+                      className={`chip ${active ? "chip-on" : ""}`}
                     >
                       {chip.label}
                     </button>
@@ -197,56 +210,33 @@ export default function BidsClient() {
             )}
           </ul>
           {areaInfo && (
-            <p className="mt-2 text-[12.5px] text-gray-600">{areaInfo.definition}</p>
+            <p className="mt-2 text-[12.5px] text-gray-500">{areaInfo.definition}</p>
           )}
         </div>
-      </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setParam({ q: input.trim() || null });
-        }}
-        className="card flex items-center px-3"
-      >
-        <input
-          type="search"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          aria-label="공고 검색"
-          placeholder="공고명·수요기관 검색"
-          className="min-h-[48px] w-full min-w-0 bg-transparent px-2.5 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500"
-        />
-        <button
-          type="submit"
-          className="min-h-[44px] shrink-0 rounded-lg px-3 text-[14px] font-bold text-gray-700 hover:text-[#7A5E08]"
-        >
-          검색
-        </button>
-      </form>
-
-      <div className="card flex flex-wrap items-center gap-x-4 gap-y-2.5 px-3 py-2.5 sm:gap-x-6 sm:p-4">
-        <Group label="상태">
-          {(Object.keys(STATUS_LABEL) as StatusKey[]).map((s) => (
-            <Seg key={s} active={status === s} onClick={() => setParam({ status: s })}>
-              {STATUS_LABEL[s]}
-            </Seg>
-          ))}
-        </Group>
-        <Group label="공고일">
-          {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
-            <Seg key={r} active={range === r} onClick={() => setParam({ range: r })}>
-              {RANGE_LABEL[r]}
-            </Seg>
-          ))}
-        </Group>
-        <Group label="정렬">
-          {(Object.keys(SORT_LABEL) as SortKey[]).map((s) => (
-            <Seg key={s} active={sort === s} onClick={() => setParam({ sort: s })}>
-              {SORT_LABEL[s]}
-            </Seg>
-          ))}
-        </Group>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--line)] px-3 py-2 sm:gap-x-6 sm:px-4">
+          <Group label="상태">
+            {(Object.keys(STATUS_LABEL) as StatusKey[]).map((s) => (
+              <Seg key={s} active={status === s} onClick={() => setParam({ status: s })}>
+                {STATUS_LABEL[s]}
+              </Seg>
+            ))}
+          </Group>
+          <Group label="공고일">
+            {(Object.keys(RANGE_LABEL) as RangeKey[]).map((r) => (
+              <Seg key={r} active={range === r} onClick={() => setParam({ range: r })}>
+                {RANGE_LABEL[r]}
+              </Seg>
+            ))}
+          </Group>
+          <Group label="정렬">
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((s) => (
+              <Seg key={s} active={sort === s} onClick={() => setParam({ sort: s })}>
+                {SORT_LABEL[s]}
+              </Seg>
+            ))}
+          </Group>
+        </div>
       </div>
 
       {error && (
@@ -256,14 +246,25 @@ export default function BidsClient() {
       )}
 
       <section className="card p-4 sm:p-6">
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-[17px] font-extrabold tracking-tight text-gray-900">
-            {areaInfo ? areaInfo.label : "전체 분야"}
-          </h2>
-          <p className="text-[12.5px] text-gray-600" aria-live="polite">
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+          <h1 className="accent-bar flex items-center text-[19px] font-extrabold tracking-tight text-gray-900">
+            {areaInfo ? `입찰공고 · ${areaInfo.label}` : "입찰공고"}
+          </h1>
+          <p className="text-[12.5px] text-gray-500" aria-live="polite">
             {loading ? "불러오는 중…" : `${items.length.toLocaleString()}건 · ${SORT_LABEL[sort]}`}
           </p>
         </div>
+        <p className="mb-3 text-[12.5px] leading-relaxed text-gray-500">
+          나라장터 공고를 1시간마다 확인해 관련 분야만 모읍니다 · 최종 확인은 원문 공고로
+          {data?.lastRun && (
+            <> · 마지막 확인 {formatRelative(data.lastRun.ranAt)}</>
+          )}
+          {data?.lastRun && !data.lastRun.ok && (
+            <span className="ml-1 text-rose-700">
+              — 경고{data.lastRun.detail ? `: ${data.lastRun.detail}` : ""}
+            </span>
+          )}
+        </p>
 
         {loading ? (
           <Skeleton />
@@ -272,14 +273,14 @@ export default function BidsClient() {
             <p className="text-[14px] text-gray-600">조건에 맞는 공고가 없습니다.</p>
             <button
               onClick={() => setParam({ area: null, status: "all", range: "all", q: null })}
-              className="mt-3 min-h-[44px] rounded-lg border border-gray-300 px-4 text-[13px] font-bold text-gray-700"
+              className="mt-3 min-h-[44px] rounded-full bg-gray-100 px-5 text-[13px] font-bold text-gray-700 transition-colors hover:bg-gray-200"
             >
               조건 넓히기 (전체 기간 · 전체 상태)
             </button>
           </div>
         ) : (
           <>
-            <ul className="divide-y divide-gray-200">
+            <ul className="divide-y divide-[var(--line)]">
               {shown.map((bid) => (
                 <BidRow key={bid.bidKey} bid={bid} />
               ))}
@@ -288,7 +289,7 @@ export default function BidsClient() {
               <div className="mt-5 text-center">
                 <button
                   onClick={() => setVisible((v) => v + PAGE)}
-                  className="inline-flex min-h-[44px] items-center rounded-full border border-gray-300 bg-white px-6 text-[14px] font-bold text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
+                  className="inline-flex min-h-[44px] items-center rounded-full bg-gray-100 px-6 text-[14px] font-bold text-gray-700 transition-colors hover:bg-gray-200"
                 >
                   더 보기
                   <span className="ml-1.5 text-[12px] text-gray-500">
@@ -314,7 +315,7 @@ function BidRow({ bid }: { bid: BidItem }) {
         {bid.areas.map((a) => (
           <span
             key={a}
-            className="rounded bg-gray-100 px-1.5 py-0.5 text-[11.5px] font-bold text-gray-700"
+            className="rounded-md bg-[#FFF4D6] px-1.5 py-0.5 text-[11.5px] font-bold text-[#8A6400]"
           >
             {bidAreaLabel(a)}
           </span>
@@ -380,8 +381,8 @@ function BidRow({ bid }: { bid: BidItem }) {
       </div>
 
       {bid.matchedTerms.length > 0 && (
-        <p className="mt-1.5 text-[11.5px] text-gray-500">
-          매칭 근거: {bid.matchedTerms.slice(0, 6).join(", ")}
+        <p className="mt-1.5 text-[11.5px] text-gray-400">
+          매칭 근거: {bid.matchedTerms.slice(0, 4).join(", ")}
         </p>
       )}
     </li>
@@ -392,9 +393,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div className="flex items-center gap-2.5">
       <span className="text-[11.5px] font-bold tracking-wide text-gray-500">{label}</span>
-      <div className="inline-flex overflow-hidden rounded-lg border border-gray-300">
-        {children}
-      </div>
+      <div className="seg-group">{children}</div>
     </div>
   );
 }
@@ -412,9 +411,7 @@ function Seg({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-[40px] border-l border-gray-300 px-3.5 text-[13.5px] font-bold transition-colors first:border-l-0 ${
-        active ? "bg-gray-900 text-white" : "bg-white text-gray-600 hover:text-gray-900"
-      }`}
+      className={`seg ${active ? "seg-on" : ""}`}
     >
       {children}
     </button>
@@ -423,7 +420,7 @@ function Seg({
 
 function Skeleton() {
   return (
-    <div className="divide-y divide-gray-200">
+    <div className="divide-y divide-[var(--line)]">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="py-5">
           <div className="h-4 w-24 animate-pulse rounded bg-gray-200" />

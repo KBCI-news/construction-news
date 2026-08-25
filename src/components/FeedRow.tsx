@@ -29,13 +29,14 @@ export function FeedRow({ item }: { item: FeedItem }) {
           </h3>
         </Link>
 
-        {/* 근거 칩 — 점수를 단독으로 표기하지 않는다. 담당자가 오판을 즉시 간파할 수 있어야 한다. */}
+        {/* 근거 칩 — 점수를 단독으로 표기하지 않는다. 담당자가 오판을 즉시 간파할 수 있어야 한다.
+            셋이면 충분하다 — 그 이상은 장식이 된다. */}
         {item.reasons.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-x-1.5 gap-y-1">
-            {item.reasons.map((r) => (
+          <ul className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-1">
+            {item.reasons.slice(0, 3).map((r) => (
               <li
                 key={`${r.kind}-${r.label}`}
-                className="rounded bg-gray-100 px-1.5 py-0.5 text-[11.5px] font-medium text-gray-700"
+                className="rounded-md bg-gray-50 px-1.5 py-0.5 text-[11.5px] font-medium text-gray-500"
               >
                 {r.label}
               </li>
@@ -43,12 +44,12 @@ export function FeedRow({ item }: { item: FeedItem }) {
           </ul>
         )}
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-gray-600">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-gray-500">
           <span>
-            <span className="font-medium text-gray-700">
+            <span className="font-medium text-gray-600">
               {item.sourceHost ?? hostOf(item.originallink)}
             </span>
-            <span className="mx-1.5">·</span>
+            <span className="mx-1.5 text-gray-300">·</span>
             <span>{formatRelative(item.pubDate)}</span>
           </span>
           <button
@@ -64,10 +65,10 @@ export function FeedRow({ item }: { item: FeedItem }) {
             }
             aria-pressed={clipped}
             aria-label={`${title} ${clipped ? "담기 해제" : "브리핑에 담기"}`}
-            className={`inline-flex min-h-[44px] items-center gap-1 rounded-lg border px-3 text-[13px] font-bold transition-colors ${
+            className={`inline-flex min-h-[40px] items-center gap-1 rounded-full px-3.5 text-[13px] font-bold transition-colors ${
               clipped
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 text-gray-700 hover:border-[#FFB81C] hover:text-[#7A5E08]"
+                ? "bg-gray-900 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
             }`}
           >
             {clipped ? "✓ 담김" : "+ 담기"}
