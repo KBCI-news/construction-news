@@ -107,6 +107,10 @@ const RULES: Record<BidAreaId, AreaRule> = {
       "취약점", "악성코드", "바이러스", "포트스캔", "보안 스캔", "스캔들",
       "3D", "3차원", "라이다", "LiDAR", "MRI", "초음파", "지문", "홍채",
       "얼굴인식", "바코드", "QR", "노면", "지하매설", "혈관", "안저",
+      // 공간정보 DB구축은 'DB구축' weak 경로로 대량 유입된다. 도면·대장
+      // 전자화는 strong으로 잡히므로 여기서 걸러도 놓치지 않는다.
+      "공간정보", "GIS", "지하시설물", "상수도", "하수관로", "수치지도",
+      "수치지형도", "정사영상", "항공촬영", "지오코딩",
     ],
     // 실측 확인: '2026년 중요 비전자기록물 전산화 사업'의 중분류가 이것이다
     classes: ["DB구축 및 자료입력"],
@@ -217,12 +221,22 @@ const nfs = (s: string): string =>
  */
 const SPACE_CROSSING_MIN_LEN = 4;
 
+/**
+ * 라틴 문자·숫자로만 된 term(OCR, GIS, 3D…)은 단어 경계로만 인정한다.
+ * 한글은 어절 경계로 걸러지지만 라틴 약어는 다른 단어 속에 그대로 묻힌다 —
+ * 'OCR'이 'Hemocron'에 걸려 검사재료 구매 공고가 80점을 받은 사고가 있었다.
+ * (\b는 ASCII 기준이라 'OCR작업'처럼 한글이 붙는 경우는 정상 매칭된다)
+ */
+const LATIN_ONLY = /^[a-z0-9]+$/;
+
 function makeHas(title: string): (term: string) => boolean {
   const spaced = nfs(title);
   const packed = nfm(title);
   return (term: string) => {
     const s = nfs(term);
-    if (s && spaced.includes(s)) return true;
+    if (!s) return false;
+    if (LATIN_ONLY.test(s)) return new RegExp(`\\b${s}\\b`).test(spaced);
+    if (spaced.includes(s)) return true;
     const m = nfm(term);
     return m.length >= SPACE_CROSSING_MIN_LEN && packed.includes(m);
   };
