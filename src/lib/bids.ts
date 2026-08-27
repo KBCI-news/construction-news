@@ -64,6 +64,12 @@ type AreaRule = {
   context: string[];
   deny: string[];
   /**
+   * strong까지 차단하는 배제어. 표현이 무엇이든 이 도메인이면 우리 사업이
+   * 아닌 것들 — GIS·측량·AI 데이터셋의 "전산화"는 문서 전자화가 아니다.
+   * ("하수도시설물 전산화 용역"이 strong '전산화 용역'을 타고 들어왔다)
+   */
+  hardDeny?: string[];
+  /**
    * 조달청 물품/용역 분류명. 공고명보다 훨씬 신뢰도가 높다 — 발주처가
    * 제목을 어떻게 짓든 분류는 체계를 따르기 때문이다. 분류가 걸리면
    * weak term의 동반어(context) 요구를 면제한다.
@@ -107,6 +113,13 @@ const RULES: Record<BidAreaId, AreaRule> = {
       "취약점", "악성코드", "바이러스", "포트스캔", "보안 스캔", "스캔들",
       "3D", "3차원", "라이다", "LiDAR", "MRI", "초음파", "지문", "홍채",
       "얼굴인식", "바코드", "QR", "노면", "지하매설", "혈관", "안저",
+    ],
+    // 실측 오탐: 하수도시설물·도로대장 "전산화"는 GIS 구축이지 문서 스캔이 아니고,
+    // "AI 학습용 데이터셋 구축"도 분류(DB구축)만 같을 뿐 다른 사업이다.
+    hardDeny: [
+      "측량", "GIS", "공간정보", "지하시설물", "지상시설물", "도로대장",
+      "하수도", "상수도", "지적재조사", "학습용 데이터", "데이터셋",
+      "인공지능", "AI 학습", "실증모델",
     ],
     // 실측 확인: '2026년 중요 비전자기록물 전산화 사업'의 중분류가 이것이다
     classes: ["DB구축 및 자료입력"],
@@ -195,7 +208,6 @@ const STRONG_SCORE = 80;
 /** 분류가 받쳐주면 동반어 없이도 인정한다 — 분류는 제목보다 정직하다 */
 const CLASS_WEAK_SCORE = 65;
 const WEAK_SCORE = 50;
-const CLASS_ONLY_SCORE = 50;
 /** 이 점수 미만은 저장하지 않는다 — 표가 오탐으로 덮이면 아무도 안 본다 */
 export const BID_MIN_RELEVANCE = WEAK_SCORE;
 
@@ -220,9 +232,17 @@ const SPACE_CROSSING_MIN_LEN = 4;
 function makeHas(title: string): (term: string) => boolean {
   const spaced = nfs(title);
   const packed = nfm(title);
+  const tokens = spaced.split(" ");
   return (term: string) => {
     const s = nfs(term);
-    if (s && spaced.includes(s)) return true;
+    if (!s) return false;
+    // 2자 이하 term은 어절 머리에서만 인정한다 — "달서고등학교"의 어절 안
+    // "서고"가 보관 분야를 켜던 유령 매칭을 막는다. ("서고를"·"서고 이전"은
+    // 어절이 서고로 시작하므로 그대로 잡힌다)
+    if (s.length <= 2 && !s.includes(" ")) {
+      return tokens.some((t) => t.startsWith(s));
+    }
+    if (spaced.includes(s)) return true;
     const m = nfm(term);
     return m.length >= SPACE_CROSSING_MIN_LEN && packed.includes(m);
   };
@@ -255,6 +275,9 @@ export function matchBid(subject: string | BidSubject): BidMatch {
   (Object.keys(RULES) as BidAreaId[]).forEach((area) => {
     const rule = RULES[area];
 
+    // 도메인 자체가 다른 공고는 표현이 무엇이든 배제한다
+    if (rule.hardDeny?.some(has)) return;
+
     const strongHits = rule.strong.filter(has);
     if (strongHits.length > 0) {
       areas.push(area);
@@ -267,7 +290,9 @@ export function matchBid(subject: string | BidSubject): BidMatch {
 
     const classHits = rule.classes.filter(hasClass);
     const weakHits = rule.weak.filter(has);
-    const contextHits = rule.context.filter(has);
+    // 같은 말이 weak와 context를 동시에 만족하면 근거가 하나뿐인 것이다 —
+    // "달서고등학교"의 '서고'가 자기 자신을 보강해 보관 분야가 켜졌다
+    const contextHits = rule.context.filter((c) => has(c) && !rule.weak.includes(c));
 
     // 분류가 받쳐주면 동반어를 요구하지 않는다. 공고명이 "2026년 ○○사업"처럼
     // 아무 정보가 없어도 분류는 체계를 따르기 때문이다.
@@ -287,12 +312,9 @@ export function matchBid(subject: string | BidSubject): BidMatch {
       return;
     }
 
-    // 분류만 걸린 건 확신이 낮지만, 놓치는 것보다는 낫다. 최소 점수로 남긴다.
-    if (classHits.length > 0) {
-      areas.push(area);
-      classHits.forEach((c) => terms.add(`분류:${c}`));
-      best = Math.max(best, CLASS_ONLY_SCORE);
-    }
+    // 분류만 걸리고 공고명에 아무 근거가 없는 건 저장하지 않는다.
+    // 이 경로가 측량·AI 데이터셋·토지적성평가까지 쓸어담았다 —
+    // 실측 표본에서 저신뢰 공고 전원이 이 경로의 오탐이었다.
   });
 
   if (areas.length === 0) return { areas: [], terms: [], relevance: 0 };

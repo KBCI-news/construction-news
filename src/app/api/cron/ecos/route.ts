@@ -102,15 +102,18 @@ export async function GET(request: NextRequest) {
       source_kind: "official",
     }));
 
-    // 중재자는 (key, as_of, value) 전체 유니크 제약.
-    // (key, as_of) 부분 인덱스는 PostgREST upsert가 중재자로 쓸 수 없다 —
-    // 처음 그렇게 썼다가 폴백이 source_kind를 뗀 채 저장해 ECOS 점들이
-    // news로 들어갔다. 실패는 감추지 않고 report로 드러낸다.
-    const histErr = (
+    // 원본은 매번 전체 구간을 다시 받으므로 공식 점은 지우고 새로 넣는다.
+    // upsert로 쌓으면 진행 중인 달의 다운샘플 점이 매일 다른 날짜로 남고
+    // (기준금리 이력이 47점으로 불던 문제), 정정된 값의 옛 행도 잔존한다.
+    const delErr = (
       await supabase
         .from("indicator_history")
-        .upsert(rows, { onConflict: "key,as_of,value", ignoreDuplicates: true })
+        .delete()
+        .eq("key", series.key)
+        .eq("source_kind", "official")
     ).error;
+    const histErr =
+      delErr ?? (await supabase.from("indicator_history").insert(rows)).error;
     if (histErr) {
       report[series.key] = `이력 적재 실패 — ${histErr.message}`;
       continue;
