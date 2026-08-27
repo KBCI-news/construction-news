@@ -168,6 +168,10 @@ export const TERMS: Term[] = [
   // --- collection : 채권추심 ---
   t("채권추심", 0, "collection", true),
   t("채권추심법", 0, "collection", true),
+  // "추심업 재편"처럼 '채권'을 생략하는 기사가 실제로 있다 — '추심'은
+  // 다른 뜻으로 쓰일 일이 없는 말이라 짧아도 안전하다
+  t("추심업", 0, "collection", true),
+  t("추심", 1, "collection"),
   t("불법추심", 0, "collection", true),
   t("채권추심회사", 0, "collection", true),
   t("채권추심업", 0, "collection", true),
@@ -565,6 +569,9 @@ export const TERM_COLLISIONS: { term: string; voidedBy: string[] }[] = [
   { term: "수상", voidedBy: ["수상한", "수상스키", "수상운송"] },
   // 증시 "공매도"는 자산 처분 절차인 "공매"와 무관하다
   { term: "공매", voidedBy: ["공매도"] },
+  // 기관명 안의 "서민금융"이 대출 데스크를 켜던 문제 — 진흥원 인사·노조
+  // 기사가 대출 뉴스로 올라왔다. 기관명 밖에서 따로 등장할 때만 인정한다.
+  { term: "서민금융", voidedBy: ["서민금융진흥원", "서민금융연구원", "서민금융硏"] },
   { term: "증정", voidedBy: ["실증정"] },
   // 법원 전자소송 근거법("민사소송 등에서의 전자문서 이용법")은
   // 우리 사업의 전자문서법(전자문서 및 전자거래 기본법)과 다른 법이다

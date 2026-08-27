@@ -68,11 +68,16 @@ export async function GET(request: NextRequest) {
       source_link: null as string | null,
       source_kind: "official",
     }));
-    const histErr = (
+    // 원본은 매번 전체 구간을 다시 받으므로 공식 점은 지우고 새로 넣는다
+    const delErr = (
       await supabase
         .from("indicator_history")
-        .upsert(rows, { onConflict: "key,as_of,value", ignoreDuplicates: true })
+        .delete()
+        .eq("key", series.key)
+        .eq("source_kind", "official")
     ).error;
+    const histErr =
+      delErr ?? (await supabase.from("indicator_history").insert(rows)).error;
     if (histErr) {
       report[series.key] = `이력 적재 실패 — ${histErr.message}`;
       continue;
