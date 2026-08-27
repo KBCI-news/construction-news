@@ -41,6 +41,11 @@ export type EcosSeries = {
   scale?: number;
   /** 저장 소수 자릿수 (기본 2) */
   digits?: number;
+  /**
+   * yoy: 전년동월비(%)로 변환한다 — CPI처럼 지수로 오는 계열용.
+   * 조회 구간을 12개월 늘려 받아 앞쪽 기준분을 확보한다.
+   */
+  transform?: "yoy";
   min: number;
   max: number;
 };
@@ -108,6 +113,68 @@ export const ECOS_SERIES: EcosSeries[] = [
     expectUnit: /%/,
     min: 0.1,
     max: 30,
+  },
+  // 아래 코드는 전부 ?raw= 프로브로 실측 확인했다 (2026-08-27).
+  {
+    key: "household_credit",
+    label: "가계신용 잔액",
+    unit: "조원",
+    sortOrder: 6,
+    statCode: "151Y001", // 가계신용(업권별, 분기)
+    itemCodes: ["1000000"], // 가계신용 총계 — 확인값 2026Q2 2,019.8조
+    cycle: "Q",
+    span: 12, // 3년
+    scale: 1000, // 십억원 → 조원
+    digits: 1,
+    expectName: /가계신용/,
+    expectUnit: /십억원/,
+    min: 500,
+    max: 5000,
+  },
+  {
+    key: "household_loan_rate",
+    label: "가계대출 금리",
+    unit: "%",
+    sortOrder: 7,
+    statCode: "121Y006", // 예금은행 가중평균 대출금리(신규취급액)
+    itemCodes: ["BECBLA03"], // 가계대출 — 확인값 2026-07 4.64%
+    cycle: "M",
+    span: 24,
+    expectName: /가중평균[\s\S]*가계대출/,
+    expectUnit: /%/,
+    min: 0.5,
+    max: 15,
+  },
+  {
+    key: "cpi_yoy",
+    label: "소비자물가 상승률",
+    unit: "%",
+    sortOrder: 8,
+    statCode: "901Y009", // 소비자물가지수(2020=100)
+    itemCodes: ["0"], // 총지수 — 확인값 2026-07 119.77
+    cycle: "M",
+    span: 24,
+    transform: "yoy", // 지수 → 전년동월비
+    digits: 1,
+    expectName: /소비자물가지수[\s\S]*총지수/,
+    expectUnit: /2020=100/,
+    min: -5,
+    max: 15,
+  },
+  {
+    key: "usd_krw",
+    label: "원/달러 환율",
+    unit: "원",
+    sortOrder: 9,
+    statCode: "731Y001", // 주요국 통화의 대원화환율
+    itemCodes: ["0000001"], // 매매기준율 — 확인값 2026-08-27 1,384.6원
+    cycle: "D",
+    span: 120, // 넉넉히 받아 차트에는 최근 24영업일이 남는다
+    digits: 1,
+    expectName: /원\/미국달러/,
+    expectUnit: /원/,
+    min: 700,
+    max: 2500,
   },
 ];
 
@@ -213,7 +280,9 @@ export async function fetchEcosSeries(
   const key = process.env.ECOS_API_KEY;
   if (!key) return { ok: false, key: series.key, reason: "ECOS_API_KEY 미설정" };
 
-  const { start, end } = ecosRange(series.cycle, series.span, nowMs);
+  // 전년동월비 계산에는 기준이 되는 앞 12개월이 더 필요하다
+  const fetchSpan = series.transform === "yoy" ? series.span + 12 : series.span;
+  const { start, end } = ecosRange(series.cycle, fetchSpan, nowMs);
   const path = [
     "StatisticSearch",
     encodeURIComponent(key),
@@ -253,20 +322,33 @@ export async function fetchEcosSeries(
     return { ok: false, key: series.key, reason: `단위 불일치: ${first.UNIT_NAME ?? "(없음)"}` };
   }
 
-  const points: EcosPoint[] = [];
+  let points: EcosPoint[] = [];
   for (const r of rows) {
     if (!r.TIME || r.DATA_VALUE == null) continue;
     const raw = Number(String(r.DATA_VALUE).replace(/,/g, ""));
     if (!Number.isFinite(raw)) continue;
     const value = Number((raw / (series.scale ?? 1)).toFixed(series.digits ?? 2));
-    if (value < series.min || value > series.max) continue;
     const asOf = ecosTimeToIso(r.TIME, series.cycle);
     if (!asOf) continue;
     points.push({ time: r.TIME, asOf, value });
   }
-  if (points.length === 0) return { ok: false, key: series.key, reason: "유효한 값 없음" };
-
   points.sort((a, b) => a.time.localeCompare(b.time));
+
+  // 지수 → 전년동월비(%). 기준분(앞 12개월)이 없는 점은 버려진다.
+  if (series.transform === "yoy") {
+    const byTime = new Map(points.map((p) => [p.time, p.value]));
+    points = points.flatMap((p) => {
+      const prevTime = `${Number(p.time.slice(0, 4)) - 1}${p.time.slice(4)}`;
+      const base = byTime.get(prevTime);
+      if (base == null || base === 0) return [];
+      const yoy = Number(((p.value / base - 1) * 100).toFixed(series.digits ?? 1));
+      return [{ ...p, value: yoy }];
+    });
+  }
+
+  // 범위 검증은 변환된 최종 값에 적용한다 (지수 120이 아니라 상승률 2%를 본다)
+  points = points.filter((p) => p.value >= series.min && p.value <= series.max);
+  if (points.length === 0) return { ok: false, key: series.key, reason: "유효한 값 없음" };
 
   // 월 1점 다운샘플 — 오름차순이므로 각 달의 마지막 값이 남고,
   // 마지막 달의 점이 곧 최신값이 된다
