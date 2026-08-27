@@ -140,7 +140,8 @@ export const ECOS_SERIES: EcosSeries[] = [
     itemCodes: ["BECBLA03"], // 가계대출 — 확인값 2026-07 4.64%
     cycle: "M",
     span: 24,
-    expectName: /가중평균[\s\S]*가계대출/,
+    // 실제 통계명은 "예금은행 대출금리(신규취급액 기준)" — 표 그룹명(가중평균)과 다르다
+    expectName: /예금은행 대출금리[\s\S]*가계대출/,
     expectUnit: /%/,
     min: 0.5,
     max: 15,
