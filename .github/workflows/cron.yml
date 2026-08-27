@@ -32,6 +32,14 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_URL }}/api/cron/ecos"
 
+      # 지표 원본 — 통계청 KOSIS (개인회생·파산 접수 등).
+      # KOSIS_API_KEY가 없거나 확정된 계열이 없으면 즉시 skip.
+      - name: Sync official indicators (KOSIS)
+        run: |
+          curl -fsS --max-time 60 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}/api/cron/kosis"
+
       # 지표 원본 — 금감원 FISIS에서 연체율 통계를 직접 받아온다.
       # FISIS_API_KEY가 없거나 확정된 계열이 없으면 즉시 skip.
       - name: Sync official indicators (FISIS)

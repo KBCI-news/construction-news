@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // 기관 원본 통계의 출처 호스트 — source_kind가 조회되지 않을 때의 판별 기준
-const OFFICIAL_HOSTS = ["ecos.bok.or.kr", "fisis.fss.or.kr"];
+const OFFICIAL_HOSTS = ["ecos.bok.or.kr", "fisis.fss.or.kr", "kosis.kr"];
 
 /**
  * 공식 통계(한국은행 ECOS 등)로 채워지는 지표 키 목록.

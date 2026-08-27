@@ -37,6 +37,10 @@ export type EcosSeries = {
    */
   expectName: RegExp;
   expectUnit: RegExp;
+  /** 원값을 이 수로 나눠 저장한다 (예: 십억원 → 조원은 1000) */
+  scale?: number;
+  /** 저장 소수 자릿수 (기본 2) */
+  digits?: number;
   min: number;
   max: number;
 };
@@ -76,6 +80,34 @@ export const ECOS_SERIES: EcosSeries[] = [
     expectUnit: /%/,
     min: 0.05,
     max: 15,
+  },
+  {
+    key: "corp_delinq",
+    label: "기업대출 연체율",
+    unit: "%",
+    sortOrder: 4,
+    statCode: "901Y124",
+    itemCodes: ["MO3AA", "AB"], // 기업대출 × 은행전체
+    cycle: "M",
+    span: 24,
+    expectName: /은행대출금 연체율[\s\S]*기업대출[\s\S]*은행전체/,
+    expectUnit: /%/,
+    min: 0.05,
+    max: 15,
+  },
+  {
+    key: "bank_card_delinq",
+    label: "은행 카드대출 연체율",
+    unit: "%",
+    sortOrder: 5,
+    statCode: "901Y124",
+    itemCodes: ["MO3AC", "AB"], // 신용카드대출 × 은행전체
+    cycle: "M",
+    span: 24,
+    expectName: /은행대출금 연체율[\s\S]*신용카드대출[\s\S]*은행전체/,
+    expectUnit: /%/,
+    min: 0.1,
+    max: 30,
   },
 ];
 
@@ -224,8 +256,10 @@ export async function fetchEcosSeries(
   const points: EcosPoint[] = [];
   for (const r of rows) {
     if (!r.TIME || r.DATA_VALUE == null) continue;
-    const value = Number(String(r.DATA_VALUE).replace(/,/g, ""));
-    if (!Number.isFinite(value) || value < series.min || value > series.max) continue;
+    const raw = Number(String(r.DATA_VALUE).replace(/,/g, ""));
+    if (!Number.isFinite(raw)) continue;
+    const value = Number((raw / (series.scale ?? 1)).toFixed(series.digits ?? 2));
+    if (value < series.min || value > series.max) continue;
     const asOf = ecosTimeToIso(r.TIME, series.cycle);
     if (!asOf) continue;
     points.push({ time: r.TIME, asOf, value });
