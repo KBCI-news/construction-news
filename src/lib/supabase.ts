@@ -16,6 +16,14 @@ export function getSupabaseAdmin(): SupabaseClient {
 
   cached = createClient(url, serviceKey, {
     auth: { persistSession: false },
+    global: {
+      // Next.js 14는 라우트 핸들러 안의 fetch를 기본으로 Data Cache에 저장하고,
+      // 이 캐시는 배포를 넘어 유지된다. supabase-js가 내부적으로 fetch를 쓰는데
+      // /api/indicators처럼 쿼리 URL이 매번 같은 조회는 응답이 통째로 박제됐다
+      // (지표 3개짜리 옛 응답이 새 배포에서도 계속 서빙된 실제 사고).
+      // DB 조회는 항상 실시간이어야 하므로 캐시를 전면 차단한다.
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
   return cached;
 }
