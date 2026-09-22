@@ -172,7 +172,7 @@ footer.doc { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 1
   <p class="eyebrow">KBCI 뉴스룸 · 정보 구조</p>
   <h1>뉴스 태그 IA</h1>
   <p class="lede">뉴스 탭의 태그 8종이 각각 어떤 조건으로 기사를 고르는지, 그 밑에서 어떤 키워드 사전이 수집·판정을 담당하는지 정리한 기준 문서. 태그·키워드 조정 논의의 출발점으로 쓴다.</p>
-  <p class="asof">2026-09-22 기준 · 반영 배포: PR #45–46</p>
+  <p class="asof">2026-09-22 기준</p>
 </header>
 
 <h2>한눈에 보기</h2>
@@ -220,10 +220,12 @@ footer.doc { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 1
       <li class="t0 q">불법추심</li><li class="t0 q">채권추심회사</li><li class="t0 q">채권추심업</li>
       <li class="t0 q">위임직채권추심인</li><li class="t0 q">채권추심 가이드라인</li>
       <li class="t0 q">매입채권추심</li><li class="t0 q">금감원 채권추심</li>
+      <li class="t0 q">개인채무자보호법</li>
     </ul>
   </div>
   <div class="termgroup"><p>관련 T1</p>
     <ul class="chips">
+      <li class="q">대부업법</li><li class="q">포용금융</li><li class="q">채무 감면</li>
       <li class="q">추심위탁</li><li class="q">특별사법경찰</li><li class="q">채권양도</li>
       <li class="q">소멸시효</li><li class="q">지급명령</li><li class="q">채권압류</li>
       <li class="q">강제집행</li><li class="q">대부업</li><li class="q">불법사금융</li>
@@ -231,14 +233,15 @@ footer.doc { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 1
       <li>추심</li><li>특사경</li><li>시효중단</li><li>시효연장</li><li>가압류</li>
       <li>대위변제</li><li>구상권</li><li>채권양도통지</li><li>추심수수료</li>
       <li>무담보채권</li><li>담보부채권</li><li>채무불이행자</li><li>추심연락</li>
-      <li>상거래채권</li><li>채권관리</li><li>대부채권 매각</li>
+      <li>상거래채권</li><li>채권관리</li><li>대부채권 매각</li><li>감면</li>
     </ul>
   </div>
+  <p class="hint">"감면" 단독은 세금·통행료 기사 오염이 커서 주변(T2)으로 두고, 같은 데스크 근거가 함께 있을 때만 태깅한다. 수집은 "채무 감면"이 담당.</p>
 </section>
 
 <section class="tag">
   <h3><span class="tagpill">법/정책</span><span class="cond"><code>kind=regulation·legislation·judgment</code> + <code>scope=curated</code></span></h3>
-  <p class="hint">회사와 관련될 법 개정·제재·판결. 특정 키워드 목록이 아니라 <b>사건종류 축</b>으로 잡는다 — 어느 데스크 소속이든 법령·제재·판결 기사면 들어오고, 업무 데스크에 전혀 안 걸린 일반 법조 기사는 걸러진다. 노란봉투법·근로자추정제·특별사법경찰 같은 노동·단속 입법은 아래 노동 축 키워드로 수집 범위를 보강했다.</p>
+  <p class="hint">회사와 관련될 법 개정·제재·판결. 특정 키워드 목록이 아니라 <b>사건종류 축</b>으로 잡는다 — 어느 데스크 소속이든 법령·제재·판결 기사면 들어오고, 업무 데스크에 전혀 안 걸린 일반 법조 기사는 걸러진다. 채권추심법·개인채무자보호법·대부업법·감면·포용금융 관련 법령 기사는 채권추심 축 키워드로 수집돼 여기에도 잡히고, 노란봉투법·근로자추정제·특별사법경찰 같은 노동·단속 입법은 아래 노동 축 키워드가 보강한다.</p>
   <div class="termgroup"><p>노동 축 보강 키워드 (T1)</p>
     <ul class="chips">
       <li class="q">근로기준법</li><li class="q">노란봉투법</li><li class="q">근로자추정제</li>
