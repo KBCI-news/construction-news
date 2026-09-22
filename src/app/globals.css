@@ -138,7 +138,8 @@ body {
     @apply inline-flex items-center rounded-[11px] bg-gray-100 p-[3px];
   }
   .seg {
-    @apply min-h-[36px] rounded-[9px] px-3.5 text-[13px] font-bold text-gray-500 transition-colors hover:text-gray-900;
+    /* 모바일 터치 타깃 — 40px 밑으로 내리지 않는다 */
+    @apply min-h-[40px] rounded-[9px] px-3.5 text-[13px] font-bold text-gray-500 transition-colors hover:text-gray-900;
   }
   .seg-on {
     @apply bg-white text-gray-900 shadow-sm hover:text-gray-900;
