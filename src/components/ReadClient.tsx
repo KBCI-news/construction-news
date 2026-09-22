@@ -51,13 +51,18 @@ export default function ReadClient() {
     };
   }, [article]);
 
-  const copyLink = async () => {
+  // 모바일이면 OS 공유 시트를, 데스크톱이면 링크 복사를 — 이름은 하나로 "공유"
+  const share = async () => {
     try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        return;
+      }
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* ignore */
+      /* 사용자가 공유 시트를 닫은 경우 등 — 무시 */
     }
   };
 
@@ -136,7 +141,7 @@ export default function ReadClient() {
       <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-[13px] font-bold tracking-wider text-gray-500 hover:text-[#9A7A12]"
+          className="inline-flex min-h-[44px] items-center gap-1 text-[14px] font-bold tracking-wider text-gray-500 hover:text-[#9A7A12]"
         >
           ← 목록으로
         </button>
@@ -149,27 +154,27 @@ export default function ReadClient() {
             <button
               onClick={() => changeScale(-0.1)}
               aria-label="글자 작게"
-              className="px-2.5 py-1.5 text-[13px] font-bold text-gray-600 hover:text-[#9A7A12]"
+              className="min-h-[40px] px-3 py-1.5 text-[14px] font-bold text-gray-600 hover:text-[#9A7A12]"
             >
               가−
             </button>
             <button
               onClick={() => changeScale(0.1)}
               aria-label="글자 크게"
-              className="border-l border-gray-300 px-2.5 py-1.5 text-[16px] font-bold text-gray-600 hover:text-[#9A7A12]"
+              className="min-h-[40px] border-l border-gray-300 px-3 py-1.5 text-[16px] font-bold text-gray-600 hover:text-[#9A7A12]"
             >
               가+
             </button>
           </div>
           <button
-            onClick={copyLink}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            onClick={share}
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
-            {copied ? "✓ 복사됨" : "🔗 링크"}
+            {copied ? "✓ 링크 복사됨" : "공유"}
           </button>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
             🖨 PDF
           </button>
@@ -177,7 +182,7 @@ export default function ReadClient() {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
+            className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
             원문 ↗
           </a>
