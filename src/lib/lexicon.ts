@@ -79,7 +79,7 @@ export const DESKS: Desk[] = [
   {
     id: "peers",
     label: "경쟁사",
-    definition: "신용정보사·F&I·CB 등 동종업계 동향",
+    definition: "신한·우리·고려신용정보 등 채권추심 회사 중심 동종업계 동향",
     className: "text-slate-700",
   },
   {
@@ -391,6 +391,7 @@ export const TERMS: Term[] = [
   t("MG신용정보", 1, "peers"),
   t("새한신용정보", 1, "peers"),
   t("솔림신용정보", 1, "peers"),
+  t("중앙신용정보", 1, "peers"),
   t("우리금융에프앤아이", 1, "peers"),
   t("하나에프앤아이", 1, "peers"),
   t("대신에프앤아이", 1, "peers"),

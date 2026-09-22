@@ -72,7 +72,7 @@ const TAGS: NewsTag[] = [
     id: "peers",
     label: "신용정보업권",
     desk: "peers",
-    hint: "신용정보사·F&I·CB 등 동종업계 동향",
+    hint: "신한·우리·고려신용정보 등 채권추심 회사들의 동향",
   },
 ];
 
@@ -342,7 +342,14 @@ export default function NewsroomClient() {
           <>
             <div className="divide-y divide-[var(--line)]">
               {shown.map((item) => (
-                <FeedRow key={item.link} item={item} />
+                // 태그를 골라 보는 중엔 카드 알약도 그 태그를 따른다 —
+                // 법/정책처럼 데스크가 아닌 조건으로 매칭되는 태그에서
+                // 기사 원소속(채권추심 등)이 뒤섞여 보이지 않게.
+                <FeedRow
+                  key={item.link}
+                  item={item}
+                  pill={!q && tag.id ? tag.label : undefined}
+                />
               ))}
             </div>
             {remaining > 0 && (

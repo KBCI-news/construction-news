@@ -8,20 +8,24 @@ import { readerHref } from "@/lib/links";
 import { Thumbnail } from "@/components/Thumbnail";
 import { useClip } from "@/components/ClipProvider";
 
-export function FeedRow({ item }: { item: FeedItem }) {
+export function FeedRow({ item, pill }: { item: FeedItem; pill?: string }) {
   const { has, toggle } = useClip();
   const clipped = has(item.link);
   const title = stripHtml(item.title);
-  const desk = item.desks[0];
+  // 정보보호(creditinfo)는 태그 체계에서 빠졌다 — 카드에도 표기하지 않는다
+  const desk = item.desks.find((d) => d !== "creditinfo");
+  // 태그를 골라 보는 중엔 카드도 그 태그로 표기한다 — 법/정책을 골랐는데
+  // 기사 원소속(채권추심 등)이 뜨면 필터가 어긋난 것처럼 읽힌다.
+  const pillText = pill ?? (desk ? deskLabel(desk) : undefined);
 
   return (
     <article className="flex items-start gap-2.5 overflow-hidden py-3.5 sm:gap-5 sm:py-5">
       <div className="min-w-0 flex-1 break-words">
         {/* 태그는 알약으로 — 회색 본문 속에서 이 기사가 어느 축인지 먼저 읽힌다 */}
-        {desk && (
+        {pillText && (
           <p className="mb-1.5">
             <span className="inline-flex items-center rounded-full bg-[#FFF4D6] px-2.5 py-[3px] text-[11.5px] font-bold text-[#8A6400]">
-              {deskLabel(desk)}
+              {pillText}
             </span>
           </p>
         )}
@@ -87,7 +91,7 @@ export function FeedRow({ item }: { item: FeedItem }) {
       >
         <Thumbnail
           src={item.imageUrl}
-          label={desk ? deskLabel(desk) : "KBCI"}
+          label={pillText ?? "KBCI"}
           className="h-[54px] w-[74px] rounded-lg sm:h-[84px] sm:w-[124px]"
         />
       </Link>
