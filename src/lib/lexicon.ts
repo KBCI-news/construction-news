@@ -179,6 +179,9 @@ export const TERMS: Term[] = [
   t("채권추심 가이드라인", 0, "collection", true),
   t("매입채권추심", 0, "collection", true),
   t("추심위탁", 1, "collection", true),
+  // 불법사금융·금융범죄 단속 주체 — 법/정책 태그에서 함께 잡힌다
+  t("특별사법경찰", 1, "collection", true),
+  t("특사경", 1, "collection"),
   t("채권양도", 1, "collection", true),
   t("소멸시효", 1, "collection", true),
   t("지급명령", 1, "collection", true),
@@ -400,8 +403,11 @@ export const TERMS: Term[] = [
   t("한국기업데이터", 1, "peers"),
 
   // --- labor : 노동 ---
+  // --- 법/정책 태그 보강: 회사 전반과 얽히는 노동 입법 ---
   t("근로기준법", 1, "labor", true),
   t("노란봉투법", 1, "labor", true),
+  t("근로자추정제", 1, "labor", true),
+  t("노동자추정제", 1, "labor"),
   t("중대재해처벌법", 1, "labor", true),
   t("산업안전보건법", 2, "labor"),
   t("고용노동부", 2, "labor"),
