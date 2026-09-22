@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/app/api/feed/route";
-import { DESKS, LEGAL_KINDS, getDesk } from "@/lib/lexicon";
+import { LEGAL_KINDS } from "@/lib/lexicon";
 import { FeedRow } from "@/components/FeedRow";
 import { useClip } from "@/components/ClipProvider";
 
@@ -18,6 +18,63 @@ const RANGE_LABEL: Record<RangeKey, string> = {
   "30d": "1달",
   all: "전체",
 };
+
+/**
+ * 뉴스 태그 — 담당자가 실제로 나눠 보는 8개 축.
+ * 데스크(desk)·법제도 필터(legal)·추가 검색어(q)를 조합해 피드 조건이 된다.
+ * 화면 제목도 이 라벨을 그대로 쓴다.
+ */
+type NewsTag = {
+  id: string; // URL의 tag= 값. 빈 문자열 = 전체
+  label: string;
+  desk?: string;
+  legal?: boolean;
+  /** 데스크 안에서 제목·요약을 추가로 좁히는 검색어 */
+  q?: string;
+  hint?: string;
+};
+
+const TAGS: NewsTag[] = [
+  { id: "", label: "전체" },
+  {
+    id: "collection",
+    label: "채권추심",
+    desk: "collection",
+    hint: "추심 업무의 법·감독·제재와 실무 동향",
+  },
+  {
+    id: "legal",
+    label: "법/정책",
+    legal: true,
+    hint: "회사와 관련될 법 개정·제재·판결 — 노란봉투법·근로기준법 개정·특별사법경찰 등 포함",
+  },
+  {
+    id: "edoc",
+    label: "전자문서",
+    desk: "edoc",
+    hint: "문서 전자화·스캔·보관, 전자계약·전자결재",
+  },
+  {
+    id: "survey",
+    label: "임대차/권리조사",
+    desk: "survey",
+    hint: "전세사기·보증금·등기·권리관계 조사",
+  },
+  { id: "kbfg", label: "KB금융", desk: "own", hint: "KB금융그룹 관련 뉴스 전량" },
+  {
+    id: "kbcard",
+    label: "KB국민카드",
+    desk: "own",
+    q: "국민카드",
+    hint: "KB국민카드 관련 뉴스",
+  },
+  {
+    id: "peers",
+    label: "신용정보업권",
+    desk: "peers",
+    hint: "신용정보사·F&I·CB 등 동종업계 동향",
+  },
+];
 
 const PAGE = 30;
 
@@ -35,11 +92,11 @@ export default function NewsroomClient() {
   const { items: clipped } = useClip();
 
   const q = params.get("q") ?? "";
-  const desk = params.get("desk") ?? "";
-  const legal = params.get("legal") === "1";
-  const general = params.get("scope") === "general";
+  const tagId = params.get("tag") ?? "";
+  const tag = TAGS.find((t) => t.id === tagId) ?? TAGS[0];
   const range = (params.get("range") as RangeKey) || "all";
-  const sort = (params.get("sort") as SortKey) || (q ? "relevance" : "score");
+  // 기본 정렬은 최신순 — 담당자는 "오늘 뭐가 새로 났나"를 먼저 본다
+  const sort = (params.get("sort") as SortKey) || (q ? "relevance" : "date");
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,17 +124,18 @@ export default function NewsroomClient() {
     sp.set("range", range);
     sp.set("sort", sort);
     sp.set("limit", "150");
-    if (q) sp.set("q", q);
-    if (general) sp.set("scope", "general");
-    else if (desk) sp.set("desk", desk);
-    if (legal && !general) {
+    // 사용자가 검색하면 태그의 내장 검색어(예: KB국민카드)보다 우선한다
+    const effectiveQ = q || tag.q || "";
+    if (effectiveQ) sp.set("q", effectiveQ);
+    if (tag.desk) sp.set("desk", tag.desk);
+    if (tag.legal) {
       LEGAL_KINDS.forEach((k) => sp.append("kind", k));
-      // 법·제도는 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
+      // 법/정책은 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
       // 무관한 일반 법조 기사(하도급 과징금, 헌재 각하 등)를 거른다
       sp.set("scope", "curated");
     }
     return sp.toString();
-  }, [q, desk, legal, general, range, sort]);
+  }, [q, tag, range, sort]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -128,17 +186,9 @@ export default function NewsroomClient() {
 
   const shown = items.slice(0, visible);
   const remaining = items.length - shown.length;
-  const deskInfo = desk && !general ? getDesk(desk) : undefined;
 
-  const heading = q
-    ? `"${q}" 검색 결과`
-    : general
-      ? "일반 뉴스"
-      : legal
-        ? "법·제도"
-        : deskInfo
-          ? deskInfo.label
-          : "업무 관련 뉴스";
+  // 화면 제목은 선택한 태그를 그대로 따른다 — 전체면 전체, 채권추심이면 채권추심
+  const heading = q ? `"${q}" 검색 결과` : tag.label;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -194,42 +244,32 @@ export default function NewsroomClient() {
           </Link>
         </div>
 
-        <div className="border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
-          <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
-            {[
-              { id: "", label: "전체" },
-              { id: "__legal__", label: "법·제도" },
-              ...DESKS.map((d) => ({ id: d.id, label: d.label })),
-              { id: "__general__", label: "일반 뉴스" },
-            ].map((chip) => {
-              const active =
-                chip.id === "__legal__"
-                  ? legal
-                  : chip.id === "__general__"
-                    ? general
-                    : !legal && !general && desk === chip.id;
-              return (
-                <li key={chip.id || "all"} className="shrink-0">
-                  <button
-                    onClick={() =>
-                      chip.id === "__legal__"
-                        ? setParam({ legal: legal ? null : "1", desk: null, scope: null })
-                        : chip.id === "__general__"
-                          ? setParam({ scope: general ? null : "general", desk: null, legal: null })
-                          : setParam({ desk: chip.id || null, legal: null, scope: null })
-                    }
-                    aria-pressed={active}
-                    className={`chip ${active ? "chip-on" : ""}`}
-                  >
-                    {chip.label}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {deskInfo && (
-            <p className="mt-2 text-[12.5px] text-gray-500">{deskInfo.definition}</p>
-          )}
+        <div className="flex items-start gap-2.5 border-t border-[var(--line)] px-3 py-2.5 sm:px-4">
+          {/* 기간·정렬과 같은 문법의 구획 라벨 — 첫 줄 칩(40px)과 세로 중앙 정렬 */}
+          <span className="shrink-0 text-[11.5px] font-bold leading-[40px] tracking-wide text-gray-500">
+            태그
+          </span>
+          <div className="min-w-0 flex-1">
+            <ul className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
+              {TAGS.map((t) => {
+                const active = tag.id === t.id;
+                return (
+                  <li key={t.id || "all"} className="shrink-0">
+                    <button
+                      onClick={() => setParam({ tag: t.id || null })}
+                      aria-pressed={active}
+                      className={`chip ${active ? "chip-on" : ""}`}
+                    >
+                      {t.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {tag.hint && (
+              <p className="mt-1.5 text-[12.5px] text-gray-500">{tag.hint}</p>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--line)] px-3 py-2 sm:gap-x-6 sm:px-4">
@@ -243,8 +283,8 @@ export default function NewsroomClient() {
           <Group label="정렬">
             {(
               [
-                ["score", "중요도순"],
                 ["date", "최신순"],
+                ["score", "중요도순"],
                 ...(q ? ([["relevance", "관련도순"]] as [SortKey, string][]) : []),
               ] as [SortKey, string][]
             ).map(([key, label]) => (
@@ -292,10 +332,10 @@ export default function NewsroomClient() {
           <div className="py-14 text-center">
             <p className="text-[14px] text-gray-600">조건에 맞는 기사가 없습니다.</p>
             <button
-              onClick={() => setParam({ desk: null, legal: null, range: null })}
+              onClick={() => setParam({ tag: null, range: null })}
               className="mt-3 min-h-[44px] rounded-full bg-gray-100 px-5 text-[13px] font-bold text-gray-700 transition-colors hover:bg-gray-200"
             >
-              조건 넓히기 (전체 기간 · 전체 주제)
+              조건 넓히기 (전체 기간 · 전체 태그)
             </button>
           </div>
         ) : (

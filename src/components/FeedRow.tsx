@@ -17,9 +17,12 @@ export function FeedRow({ item }: { item: FeedItem }) {
   return (
     <article className="flex items-start gap-2.5 overflow-hidden py-3.5 sm:gap-5 sm:py-5">
       <div className="min-w-0 flex-1 break-words">
+        {/* 태그는 알약으로 — 회색 본문 속에서 이 기사가 어느 축인지 먼저 읽힌다 */}
         {desk && (
-          <p className="mb-1.5 text-[12px] font-bold tracking-wide text-[#7A5E08]">
-            {deskLabel(desk)}
+          <p className="mb-1.5">
+            <span className="inline-flex items-center rounded-full bg-[#FFF4D6] px-2.5 py-[3px] text-[11.5px] font-bold text-[#8A6400]">
+              {deskLabel(desk)}
+            </span>
           </p>
         )}
 
