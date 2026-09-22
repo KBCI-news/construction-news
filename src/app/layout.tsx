@@ -3,11 +3,10 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import { ClipProvider } from "@/components/ClipProvider";
 
 export const metadata: Metadata = {
   title: "KBCI 뉴스룸",
-  description: "KB신용정보 사내 뉴스 모니터링 · 게시용 브리핑",
+  description: "KB신용정보 사내 뉴스 모니터링",
 };
 
 export const viewport = {
@@ -26,18 +25,16 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           본문 바로가기
         </a>
-        <ClipProvider>
-          <Suspense fallback={null}>
-            <Header />
-          </Suspense>
-          <main
-            id="main-content"
-            className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-3 py-4 pb-28 sm:px-8 sm:py-9"
-          >
-            {children}
-          </main>
-          <ScrollToTop />
-        </ClipProvider>
+        <Suspense fallback={null}>
+          <Header />
+        </Suspense>
+        <main
+          id="main-content"
+          className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-3 py-4 pb-16 sm:px-8 sm:py-9"
+        >
+          {children}
+        </main>
+        <ScrollToTop />
       </body>
     </html>
   );

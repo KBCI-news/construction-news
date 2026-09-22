@@ -222,20 +222,62 @@ function Trend({ points, unit }: { points: IndicatorPoint[]; unit: string | null
   );
 }
 
+/** 타일용 미니 스파크라인 — 라벨·격자 없이 모양만. 상세 차트는 아래 패널이 담당 */
+function Spark({ points }: { points: IndicatorPoint[] }) {
+  if (points.length < 2) return <div className="h-[26px]" />;
+  const SW = 96;
+  const SH = 26;
+  const vals = points.map((p) => p.value);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = max - min || Math.abs(max) * 0.06 || 1;
+  const sx = (i: number) => (i / (points.length - 1)) * (SW - 6) + 2;
+  const sy = (v: number) => SH - 3 - ((v - min) / span) * (SH - 6);
+  const d = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${sx(i).toFixed(1)},${sy(p.value).toFixed(1)}`)
+    .join(" ");
+  const li = points.length - 1;
+  return (
+    <svg viewBox={`0 0 ${SW} ${SH}`} className="block h-[26px] w-full" aria-hidden>
+      <path d={d} fill="none" stroke="#C9A227" strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx={sx(li)} cy={sy(points[li].value)} r="2.4" fill="#B98A10" />
+    </svg>
+  );
+}
+
 /**
  * 경제지표 보드. 값은 한국은행 등 기관 원본 통계나 수집 기사에서 자동으로
  * 채워진다. 확인되지 않은 지표는 표시하지 않는다 — 게시판에 틀린 숫자가
  * 붙는 것이 더 나쁘다.
+ *
+ * 레이아웃: 요약 타일 그리드(전 지표가 한 화면) + 선택한 지표의 상세 차트
+ * 패널. 카드 9장을 세로로 쌓던 구조는 끝까지 스크롤해야 전체가 보였다.
  */
 export function IndicatorBoard() {
   const [items, setItems] = useState<Indicator[] | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/indicators")
       .then((r) => r.json())
-      .then((j) => setItems(j.indicators ?? []))
+      .then((j) => {
+        const list: Indicator[] = j.indicators ?? [];
+        setItems(list);
+        setSelected((cur) => cur ?? list[0]?.key ?? null);
+      })
       .catch(() => setItems([]));
   }, []);
+
+  const pick = (key: string) => {
+    setSelected(key);
+    // 모바일에선 그리드가 길어 상세 패널이 화면 밖일 수 있다 — 선택 즉시 보이게
+    requestAnimationFrame(() => {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
+
+  const detail = items?.find((it) => it.key === selected) ?? null;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -244,13 +286,13 @@ export function IndicatorBoard() {
           <h1 className="accent-bar flex items-center text-[19px] font-extrabold tracking-tight text-gray-900">
             경제지표
           </h1>
-          <p className="text-[12px] text-gray-500">자동 수집 · 카드의 출처·기준일 확인</p>
+          <p className="text-[12px] text-gray-500">자동 수집 · 지표를 누르면 추이가 열립니다</p>
         </div>
 
         {items === null ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[210px] animate-pulse rounded-xl bg-gray-100" />
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="h-[96px] animate-pulse rounded-xl bg-gray-100" />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -258,37 +300,80 @@ export function IndicatorBoard() {
             확인된 지표가 아직 없습니다.
           </p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((it) => (
-              <li key={it.key} className="rounded-xl border border-[var(--line)] px-4 py-3.5">
-                <p className="flex items-center justify-between gap-1">
-                  <span className="text-[13px] font-bold text-gray-700">{it.label}</span>
+          <>
+            <ul className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+              {items.map((it) => {
+                const active = it.key === selected;
+                return (
+                  <li key={it.key}>
+                    <button
+                      onClick={() => pick(it.key)}
+                      aria-pressed={active}
+                      className={`block w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                        active
+                          ? "border-[#FFB81C] bg-[#FFFBF0]"
+                          : "border-[var(--line)] hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <p className="truncate text-[12px] font-bold text-gray-600">
+                        {it.label}
+                      </p>
+                      <p className="mt-1 flex items-baseline gap-1 whitespace-nowrap">
+                        <span className="text-[19px] font-extrabold tracking-tight text-gray-900">
+                          {it.value}
+                        </span>
+                        <span className="text-[11.5px] font-bold text-gray-500">
+                          {it.unit}
+                        </span>
+                        <span className="ml-auto">
+                          <Trend points={it.history} unit={it.unit} />
+                        </span>
+                      </p>
+                      <div className="mt-1.5">
+                        <Spark points={it.history} />
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* 상세 패널 — 선택한 지표의 큰 차트와 출처·기준일 */}
+            {detail && (
+              <div
+                ref={detailRef}
+                className="mt-4 rounded-xl border border-[var(--line)] bg-white px-4 py-3.5 sm:px-5 sm:py-4"
+              >
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-[15px] font-extrabold text-gray-900">
+                    {detail.label}
+                  </span>
                   <span
                     className={`rounded px-1.5 py-px text-[10.5px] font-bold ${
-                      it.sourceKind === "official"
+                      detail.sourceKind === "official"
                         ? "bg-[#FFF4D6] text-[#8A6400]"
                         : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {it.sourceLabel}
+                    {detail.sourceLabel}
+                  </span>
+                  <span className="ml-auto text-[11.5px] tabular-nums text-gray-500">
+                    {asOfLabel(detail.asOf)}
                   </span>
                 </p>
-                <p className="mt-1.5 flex items-baseline gap-1.5 whitespace-nowrap">
-                  <span className="text-[26px] font-extrabold tracking-tight text-gray-900">
-                    {it.value}
+                <p className="mt-1 flex items-baseline gap-1.5 whitespace-nowrap">
+                  <span className="text-[28px] font-extrabold tracking-tight text-gray-900">
+                    {detail.value}
                   </span>
-                  <span className="text-[13px] font-bold text-gray-600">{it.unit}</span>
-                  <span className="ml-auto">
-                    <Trend points={it.history} unit={it.unit} />
+                  <span className="text-[14px] font-bold text-gray-600">{detail.unit}</span>
+                  <span className="ml-2">
+                    <Trend points={detail.history} unit={detail.unit} />
                   </span>
                 </p>
-                <p className="mt-0.5 text-[11px] tabular-nums text-gray-500">
-                  {asOfLabel(it.asOf)}
-                </p>
-                <TrendChart points={it.history} unit={it.unit} />
-              </li>
-            ))}
-          </ul>
+                <TrendChart points={detail.history} unit={detail.unit} />
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

@@ -1,12 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/app/api/feed/route";
 import { LEGAL_KINDS } from "@/lib/lexicon";
 import { FeedRow } from "@/components/FeedRow";
-import { useClip } from "@/components/ClipProvider";
 
 type SortKey = "score" | "date" | "relevance";
 type RangeKey = "24h" | "7d" | "30d" | "all";
@@ -89,7 +87,6 @@ function logSearch(query: string) {
 export default function NewsroomClient() {
   const router = useRouter();
   const params = useSearchParams();
-  const { items: clipped } = useClip();
 
   const q = params.get("q") ?? "";
   const tagId = params.get("tag") ?? "";
@@ -227,21 +224,6 @@ export default function NewsroomClient() {
               검색
             </button>
           </form>
-
-          {/* 브리핑은 이 사이트의 최종 산출물 — 항상 눈에 띄는 자리에 둔다 */}
-          <Link
-            href="/brief"
-            aria-label="브리핑 만들기"
-            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gray-900 px-3.5 text-[14.5px] font-bold text-white transition-colors hover:bg-black sm:gap-2 sm:px-4"
-          >
-            <span aria-hidden>🖨</span>
-            <span className="hidden sm:inline">브리핑 만들기</span>
-            {clipped.length > 0 && (
-              <span className="rounded-full bg-[#FFB81C] px-1.5 py-0.5 text-[12px] font-extrabold tabular-nums text-gray-900 sm:px-2">
-                {clipped.length}
-              </span>
-            )}
-          </Link>
         </div>
 
         <div className="flex items-start gap-2.5 border-t border-[var(--line)] px-3 py-2.5 sm:px-4">

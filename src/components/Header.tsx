@@ -51,12 +51,6 @@ export function Header() {
               </p>
             </div>
           </Link>
-          <Link
-            href="/brief"
-            className="inline-flex min-h-[40px] items-center rounded-lg border border-gray-300 px-3 text-[13px] font-bold text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#7A5E08]"
-          >
-            🖨 브리핑
-          </Link>
         </div>
 
         <nav aria-label="주요 섹션" className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

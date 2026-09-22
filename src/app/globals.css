@@ -212,16 +212,6 @@ body {
   margin: 0.3em 0;
 }
 
-/* 리더 첫 문단 드롭캡 — 에디토리얼 감성 */
-.article-body > p:first-of-type::first-letter {
-  float: left;
-  margin: 0.02em 0.08em 0 0;
-  font-size: 3.1em;
-  font-weight: 800;
-  line-height: 0.86;
-  color: #111;
-}
-
 /* 프리미엄 디테일 */
 ::selection {
   background: rgba(255, 184, 28, 0.28);
@@ -311,13 +301,6 @@ button {
   .article-body {
     font-size: 10.5pt;
     line-height: 1.55;
-  }
-  .article-body > p:first-of-type::first-letter {
-    float: none;
-    font-size: inherit;
-    font-weight: inherit;
-    line-height: inherit;
-    margin: 0;
   }
   .article-body p {
     orphans: 3;

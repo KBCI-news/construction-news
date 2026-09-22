@@ -51,13 +51,18 @@ export default function ReadClient() {
     };
   }, [article]);
 
-  const copyLink = async () => {
+  // 모바일이면 OS 공유 시트를, 데스크톱이면 링크 복사를 — 이름은 하나로 "공유"
+  const share = async () => {
     try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        return;
+      }
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* ignore */
+      /* 사용자가 공유 시트를 닫은 경우 등 — 무시 */
     }
   };
 
@@ -162,10 +167,10 @@ export default function ReadClient() {
             </button>
           </div>
           <button
-            onClick={copyLink}
+            onClick={share}
             className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-[13px] font-bold tracking-wider text-gray-700 transition-colors hover:border-[#FFB81C] hover:text-[#9A7A12]"
           >
-            {copied ? "✓ 복사됨" : "🔗 링크"}
+            {copied ? "✓ 링크 복사됨" : "공유"}
           </button>
           <button
             onClick={() => window.print()}
