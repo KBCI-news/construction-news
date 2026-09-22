@@ -182,6 +182,13 @@ export const TERMS: Term[] = [
   // 불법사금융·금융범죄 단속 주체 — 법/정책 태그에서 함께 잡힌다
   t("특별사법경찰", 1, "collection", true),
   t("특사경", 1, "collection"),
+  // 추심 물량·회수 실무와 직결되는 법제 — 법/정책 태그에서도 함께 잡힌다
+  t("개인채무자보호법", 0, "collection", true),
+  t("대부업법", 1, "collection", true),
+  t("포용금융", 1, "collection", true),
+  t("채무 감면", 1, "collection", true),
+  // "감면" 단독은 세금·통행료 등 오염이 커서 T2 — 같은 데스크 근거가 있어야 태깅
+  t("감면", 2, "collection"),
   t("채권양도", 1, "collection", true),
   t("소멸시효", 1, "collection", true),
   t("지급명령", 1, "collection", true),
@@ -208,7 +215,7 @@ export const TERMS: Term[] = [
   t("대부채권 매각", 1, "collection"),
 
   // --- debtor : 채무자보호 ---
-  t("개인채무자보호법", 0, "debtor", true),
+  // 개인채무자보호법은 채권추심 데스크로 이동 — 추심 태그에서 보이게 (담당자 요청)
   t("채무조정", 0, "debtor", true),
   t("개인회생", 1, "debtor", true),
   t("개인파산", 1, "debtor", true),
