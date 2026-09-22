@@ -130,6 +130,9 @@ export default function NewsroomClient() {
       // 법/정책은 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
       // 무관한 일반 법조 기사(하도급 과징금, 헌재 각하 등)를 거른다
       sp.set("scope", "curated");
+    } else if (!tag.desk && !q) {
+      // 전체 태그도 업무 태그가 붙은 기사만 — 태그 없는 일반 뉴스는 검색으로만 닿는다
+      sp.set("scope", "curated");
     }
     return sp.toString();
   }, [q, tag, range, sort]);

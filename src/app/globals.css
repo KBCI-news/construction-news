@@ -88,9 +88,11 @@ html {
 
 body {
   color: var(--foreground);
-  /* 은은한 세로 그라데이션 배경으로 깊이감 부여 */
-  background: linear-gradient(180deg, #f6f7f9 0%, #eef0f4 100%);
-  background-attachment: fixed;
+  /* 은은한 세로 그라데이션 배경으로 깊이감 부여.
+     background-attachment: fixed는 모바일 스크롤마다 전체 리페인트를
+     일으키는 대표적 성능 함정이라 쓰지 않는다. */
+  background: linear-gradient(180deg, #f6f7f9 0%, #eef0f4 100%) no-repeat;
+  background-color: #eef0f4;
   font-family:
     "KBFG", "Pretendard", -apple-system, BlinkMacSystemFont,
     "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", Arial, sans-serif;

@@ -36,7 +36,8 @@ export function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white/90 shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)] backdrop-blur-md">
+    // backdrop-blur는 모바일 스크롤 프레임을 깎아 먹는다 — 불투명 배경으로 충분
+    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)]">
       <div className="h-[3px] w-full bg-gradient-to-r from-[#FFB81C] to-[#FFD37A]" />
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
         <div className="flex items-center justify-between py-3">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, type ArticleRow } from "@/lib/supabase";
+import { stripHtml } from "@/lib/format";
 import { searchRank } from "@/lib/scoring";
 import type { ImportanceTier } from "@/lib/lexicon";
 import type { ReasonTag } from "@/lib/scoring";
@@ -57,6 +58,13 @@ type Row = Pick<
   is_rep: boolean | null;
   matched_terms: string[] | null;
 };
+
+/** 목록 응답에서 요약은 표시·검색 폴백용 240자면 충분하다 —
+    150건 × 원문 크기의 JSON이 모바일 첫 로드를 무겁게 했다 */
+const slim = (it: FeedItem): FeedItem => ({
+  ...it,
+  description: stripHtml(it.description).slice(0, 240),
+});
 
 const toItem = (r: Row): FeedItem => ({
   link: r.link,
@@ -164,7 +172,11 @@ export async function GET(request: NextRequest) {
         .map((x) => x.it);
     }
     return NextResponse.json(
-      { total: items.length, items: items.slice(0, limit), unscored: true } satisfies FeedResponse,
+      {
+        total: items.length,
+        items: items.slice(0, limit).map(slim),
+        unscored: true,
+      } satisfies FeedResponse,
       { headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -182,7 +194,7 @@ export async function GET(request: NextRequest) {
       .map((x) => x.it);
   }
 
-  items = items.slice(0, limit);
+  items = items.slice(0, limit).map(slim);
 
   return NextResponse.json(
     { total: items.length, items, unscored } satisfies FeedResponse,
