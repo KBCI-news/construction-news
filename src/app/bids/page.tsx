@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function BidsPage() {
   return (
-    <Suspense fallback={<ListSkeleton toolbarHeight={221} />}>
+    <Suspense fallback={<ListSkeleton toolbarHeight={177} />}>
       <BidsClient />
     </Suspense>
   );
