@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
-import { deskLabel } from "@/lib/lexicon";
+import { tagLabelOf } from "@/lib/lexicon";
 import { formatRelative, hostOf, stripHtml } from "@/lib/format";
 import { readerHref } from "@/lib/links";
 import { Thumbnail } from "@/components/Thumbnail";
 
 export function FeedRow({ item, pill }: { item: FeedItem; pill?: string }) {
   const title = stripHtml(item.title);
-  // 정보보호(creditinfo)는 태그 체계에서 빠졌다 — 카드에도 표기하지 않는다
-  const desk = item.desks.find((d) => d !== "creditinfo");
   // 태그를 골라 보는 중엔 카드도 그 태그로 표기한다 — 법/정책을 골랐는데
   // 기사 원소속(채권추심 등)이 뜨면 필터가 어긋난 것처럼 읽힌다.
-  const pillText = pill ?? (desk ? deskLabel(desk) : undefined);
+  // 그 밖에는 태그 목록과 같은 이름으로만 표기한다.
+  const pillText = pill ?? tagLabelOf(item);
 
   return (
     <article className="overflow-hidden">

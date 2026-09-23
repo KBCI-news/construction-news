@@ -40,6 +40,18 @@ function findTermGuarded(
   return stripped.includes(norm) ? hit : null;
 }
 
+// 문맥 필수어가 있는 term은 제목·요약에 그 문맥이 함께 있어야 인정한다.
+// 본문은 보지 않는다 — 관련기사·타 부서 단속 목록이 섞여 들어오기 때문이다.
+function contextOk(
+  hay: NormalizedHaystack,
+  pt: { requiresNorms?: string[] },
+): boolean {
+  if (!pt.requiresNorms?.length) return true;
+  return pt.requiresNorms.some(
+    (r) => hay.title.includes(r) || hay.description.includes(r),
+  );
+}
+
 // 8축 가중치 (합 100). 점수는 서버 cron에서 미리 계산해 저장한다.
 const W = {
   tier: 25, // 업무 근접도
@@ -120,7 +132,7 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
 
   for (const pt of PREPARED_TERMS) {
     const hit = findTermGuarded(hay, pt.norm);
-    if (!hit) continue;
+    if (!hit || !contextOk(hay, pt)) continue;
     matchedTerms.push(pt.term);
     // 감독기관명은 발신 주체 신호로만 쓴다 — 업무 근접도·데스크에 기여하지 않는다
     if (pt.authOnly) continue;
@@ -254,7 +266,7 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
     let inTitle = false;
     for (const p of nearTerms) {
       const hit = findTerm(hay, p.norm);
-      if (!hit) continue;
+      if (!hit || !contextOk(hay, p)) continue;
       if (hit.field === "title") inTitle = true;
       if (hit.field === "body" || hit.field === "description") inBody += 1;
     }

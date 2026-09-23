@@ -44,7 +44,7 @@ const TAGS: NewsTag[] = [
     id: "legal",
     label: "법/정책",
     legal: true,
-    hint: "회사와 관련될 법 개정·제재·판결 — 개인채무자보호법·대부업법·노란봉투법·특별사법경찰 등 포함",
+    hint: "회사와 관련될 법 개정·제재·판결 — 개인채무자보호법·대부업법·노란봉투법, 대부업·추심 특사경 단속 등 포함",
   },
   {
     id: "edoc",
@@ -131,8 +131,9 @@ export default function NewsroomClient() {
       // 무관한 일반 법조 기사(하도급 과징금, 헌재 각하 등)를 거른다
       sp.set("scope", "curated");
     } else if (!tag.desk && !q) {
-      // 전체 태그도 업무 태그가 붙은 기사만 — 태그 없는 일반 뉴스는 검색으로만 닿는다
-      sp.set("scope", "curated");
+      // 전체 = 아래 태그들의 합집합. 태그 체계 밖(정보보호·부실채권 등)만 걸린
+      // 기사와 태그 없는 일반 뉴스는 검색으로만 닿는다
+      sp.set("scope", "tagged");
     }
     return sp.toString();
   }, [q, tag, range, sort]);
@@ -196,7 +197,10 @@ export default function NewsroomClient() {
           컨트롤이 카드 세 장으로 흩어져 있던 것이 화면을 번잡하게 했다. */}
       <div className="card overflow-hidden">
         <div className="flex items-center gap-2 p-2 pl-3 sm:gap-3 sm:p-2.5 sm:pl-4">
-          <form onSubmit={submitSearch} className="flex min-w-0 flex-1 items-center">
+          <form
+            onSubmit={submitSearch}
+            className="flex min-w-0 flex-1 items-center rounded-xl pl-2 ring-inset transition-shadow focus-within:ring-2 focus-within:ring-[#FFB81C]"
+          >
             <svg
               className="pointer-events-none h-5 w-5 shrink-0 text-gray-400"
               fill="none"

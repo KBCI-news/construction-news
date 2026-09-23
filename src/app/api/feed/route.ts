@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin, type ArticleRow } from "@/lib/supabase";
 import { stripHtml } from "@/lib/format";
 import { searchRank } from "@/lib/scoring";
-import type { ImportanceTier } from "@/lib/lexicon";
+import { LEGAL_KINDS, TAG_DESKS, type ImportanceTier } from "@/lib/lexicon";
 import type { ReasonTag } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
 
   if (desk) query = query.contains("desks", [desk]);
   if (scope === "general") query = query.eq("desks", "{}");
-  else if (scope === "curated") query = query.neq("desks", "{}");
+  else if (scope === "curated" || scope === "tagged") query = query.neq("desks", "{}");
   if (kinds.length) query = query.overlaps("kinds", kinds);
   if (!Number.isNaN(minScore) && p.get("minScore")) {
     query = query.gte("importance", minScore);
@@ -141,7 +141,13 @@ export async function GET(request: NextRequest) {
       .order("pub_date", { ascending: false });
   }
 
-  const fetchLimit = sort === "relevance" ? Math.min(limit * 4, 400) : limit;
+  // tagged는 서버에서 한 번 더 거르므로 넉넉히 받아 둔다
+  const fetchLimit =
+    sort === "relevance"
+      ? Math.min(limit * 4, 400)
+      : scope === "tagged"
+        ? Math.min(limit * 2, 400)
+        : limit;
   const { data, error } = await query.limit(fetchLimit);
 
   // 큐레이션 마이그레이션(0004)이 아직 적용되지 않은 환경에서도 사이트가 죽지 않게
@@ -183,6 +189,15 @@ export async function GET(request: NextRequest) {
 
   const rows = (data ?? []) as unknown as Row[];
   let items = rows.map(toItem);
+  // scope=tagged : 뉴스 화면의 태그 중 하나에라도 속하는 기사만 ("전체" 태그).
+  // 태그 체계에 없는 데스크(정보보호·부실채권·대출 등)만 걸린 기사는 뺀다.
+  if (scope === "tagged") {
+    items = items.filter(
+      (it) =>
+        it.desks.some((d) => TAG_DESKS.includes(d)) ||
+        it.kinds.some((k) => (LEGAL_KINDS as string[]).includes(k)),
+    );
+  }
   const unscored = items.length > 0 && items.every((it) => it.importance === null);
 
   if (sort === "relevance" && q) {

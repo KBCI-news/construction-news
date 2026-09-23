@@ -158,7 +158,7 @@ export default function BidsClient() {
             e.preventDefault();
             setParam({ q: input.trim() || null });
           }}
-          className="flex items-center px-3 sm:px-4"
+          className="m-1.5 flex items-center rounded-xl px-2 ring-inset transition-shadow focus-within:ring-2 focus-within:ring-[#FFB81C] sm:px-3"
         >
           <svg
             className="pointer-events-none h-5 w-5 shrink-0 text-gray-400"

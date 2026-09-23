@@ -228,11 +228,22 @@ button {
     box-shadow 0.2s ease,
     transform 0.2s ease;
 }
-/* 스크롤 시 sticky 헤더 가독성 위해 부드러운 포커스 링 */
+/* 모바일 탭 시 번쩍이는 파란 하이라이트 제거 — 눌림 피드백은 각 요소의 active 상태가 맡는다 */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+/* 키보드 포커스 링 — 파란 기본값 대신 사이트 잉크색. 입력창은 링 대신 감싸는 상자가
+   KB 옐로우로 강조된다(focus-within). 입력창은 클릭만으로도 focus-visible이 걸려
+   검색창에 굵은 파란 테두리가 뜨던 문제. */
 :focus-visible {
-  outline: 3px solid #1d4ed8;
+  outline: 2px solid #1f2937;
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 /* 어두운 면 위에서는 흰 링으로 전환 */
 .bg-gray-900 :focus-visible,
