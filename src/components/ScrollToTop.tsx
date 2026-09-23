@@ -6,8 +6,15 @@ export function ScrollToTop() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > 700);
-    onScroll();
+    // 내려 읽는 동안엔 숨겨 표·숫자를 가리지 않는다 — 위로 되돌아갈 때만 나타난다
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y < 700) setShow(false);
+      else if (y < lastY - 4) setShow(true);
+      else if (y > lastY + 4) setShow(false);
+      lastY = y;
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -19,7 +26,7 @@ export function ScrollToTop() {
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="맨 위로 이동"
-      className="no-print fixed bottom-5 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white/90 text-gray-700 shadow-lg backdrop-blur transition hover:-translate-y-0.5 hover:text-[#9A7A12]"
+      className="no-print fixed bottom-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-800 shadow-lg active:bg-gray-100"
     >
       <svg
         className="h-5 w-5"

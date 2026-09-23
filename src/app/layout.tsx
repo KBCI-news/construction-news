@@ -1,17 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
 export const metadata: Metadata = {
-  title: "KBCI 뉴스룸",
+  title: { default: "KBCI 뉴스룸", template: "%s | KBCI 뉴스룸" },
   description: "KB신용정보 사내 뉴스 모니터링",
+  robots: { index: false, follow: false },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -30,7 +32,8 @@ export default function RootLayout({
         </Suspense>
         <main
           id="main-content"
-          className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-3 py-4 pb-16 sm:px-8 sm:py-9"
+          tabIndex={-1}
+          className="mx-auto min-h-screen max-w-[1280px] overflow-x-hidden px-3 py-4 pb-16 focus:outline-none sm:px-8 sm:py-9"
         >
           {children}
         </main>
