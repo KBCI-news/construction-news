@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { POLL_MINUTES, QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
-import { fetchOgImage } from "@/lib/og";
 import { scoreArticle } from "@/lib/scoring";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
@@ -15,11 +14,6 @@ const PER_KEYWORD = 100;
 // 한 회차에 호출할 검색어 상한 — 분산 후 한 슬롯 최대치(T0 전부 + T1의 1/4 +
 // 하위 티어 몇 개)를 넉넉히 덮는다. 이 값에 걸려 잘리면 응답의 dropped에 남는다.
 const MAX_QUERIES_PER_RUN = 48;
-
-// 이미지 백필: 매번 최신만 재시도하면 NULL 백로그가 단조 증가하므로
-// 오래된 것부터 순환하도록 pub_date 오름차순으로 가져온다.
-const MAX_IMAGE_CRAWL = 60;
-const IMAGE_CONCURRENCY = 10;
 
 type ArticleUpsert = {
   link: string;
@@ -178,7 +172,7 @@ export async function GET(request: NextRequest) {
     upsertedCount = count ?? rows.length;
   }
 
-  const imagesFilled = await backfillImages(supabase);
+  // 썸네일 채우기는 /api/cron/images가 따로 돈다
 
   const { error: purgeError } = await supabase.rpc("purge_old_articles");
   await supabase.rpc("purge_old_search_logs");
@@ -190,49 +184,7 @@ export async function GET(request: NextRequest) {
     fetched: fetchedCount,
     unique: rows.length,
     upserted: upsertedCount,
-    imagesFilled,
     failures,
     ...(purgeError ? { warning: "Purge failed", detail: purgeError.message } : {}),
   });
-}
-
-async function backfillImages(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-): Promise<number> {
-  // 중요도가 높은 기사부터 이미지를 채운다 — 게시판에 붙일 후보가 우선이다
-  const { data, error } = await supabase
-    .from("articles")
-    .select("link, original_link")
-    .is("image_url", null)
-    .gte("pub_date", new Date(Date.now() - 3 * 86_400_000).toISOString())
-    .order("importance", { ascending: false, nullsFirst: false })
-    .limit(MAX_IMAGE_CRAWL);
-
-  if (error || !data || data.length === 0) return 0;
-
-  const targets = data as { link: string; original_link: string | null }[];
-  let filled = 0;
-
-  for (let i = 0; i < targets.length; i += IMAGE_CONCURRENCY) {
-    const batch = targets.slice(i, i + IMAGE_CONCURRENCY);
-    const resolved = await Promise.all(
-      batch.map(async (row) => ({
-        link: row.link,
-        image: await fetchOgImage(row.original_link || row.link),
-      })),
-    );
-    await Promise.all(
-      resolved
-        .filter((r) => r.image)
-        .map(async (r) => {
-          const { error: updateError } = await supabase
-            .from("articles")
-            .update({ image_url: r.image })
-            .eq("link", r.link);
-          if (!updateError) filled += 1;
-        }),
-    );
-  }
-
-  return filled;
 }

@@ -24,6 +24,15 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_URL }}/api/cron/score"
 
+      # 뉴스 썸네일 — 화면에 나오는 대표 기사부터 원문 og:image를 채운다.
+      # 실패해도 다음 단계는 계속한다(썸네일이 없으면 화면이 자리표시로 대체).
+      - name: Fill thumbnails
+        continue-on-error: true
+        run: |
+          curl -fsS --max-time 70 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_URL }}/api/cron/images"
+
       # 지표 원본 — 한국은행 ECOS에서 통계를 직접 받아온다.
       # ECOS_API_KEY가 없으면 즉시 skip 응답이라 실패하지 않는다.
       - name: Sync official indicators (ECOS)
