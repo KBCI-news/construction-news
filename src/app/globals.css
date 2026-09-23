@@ -41,18 +41,19 @@
 }
 
 :root {
-  --background: #f3f4f7;
   --foreground: #16161a;
   --surface: #ffffff;
   --line: #e9eaee;
   --kb: #ffb81c;
-  --kb-ink: #8a6d10;
+  --kb-ink: #7a5e08;
 }
 
 html {
-  /* 고령 사용자 가독성을 위해 기본 폰트 크기를 키운다 */
+  /* rem 기반 여백·크기만 6% 키운다. 글자 크기는 컴포넌트가 px로 정한다 — 16px로 내리면 터치 영역이 44px 밑으로 준다 */
   font-size: 17px;
-  overflow-x: hidden; /* 가로 오버플로로 인한 레이아웃 깨짐 방지 */
+  /* clip은 스크롤 컨테이너를 만들지 않아 헤더 sticky가 산다 — 미지원 구형 사파리는 hidden으로 남는다 */
+  overflow-x: hidden;
+  overflow-x: clip;
   scroll-behavior: smooth;
 }
 
@@ -99,7 +100,9 @@ body {
   line-height: 1.6;
   letter-spacing: -0.01em;
   word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
+  /* clip은 스크롤 컨테이너를 만들지 않아 헤더 sticky가 산다 — 미지원 구형 사파리는 hidden으로 남는다 */
   overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -127,12 +130,13 @@ body {
   }
 
   /* 필터 칩 — 테두리 대신 면으로. 켜진 것은 KB 브랜드 옐로우로 드러난다.
-     노란 바탕에는 어두운 잉크가 필요하다 (흰 글자는 대비 미달). */
+     노란 바탕에는 어두운 잉크가 필요하다 (흰 글자는 대비 미달).
+     좌우 13px — 360~430px 폭에서 다음 칩이 반쯤 비쳐 옆으로 밀 수 있음을 알린다. */
   .chip {
-    @apply inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full bg-gray-100 px-3.5 text-[13.5px] font-bold text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900;
+    @apply inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full bg-gray-100 px-[13px] text-[13.5px] font-bold text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900 active:bg-gray-200;
   }
   .chip-on {
-    @apply bg-[#FFB81C] text-gray-900 hover:bg-[#FFB81C] hover:text-gray-900;
+    @apply bg-[#FFB81C] text-gray-900 hover:bg-[#FFB81C] hover:text-gray-900 active:bg-[#FFB81C];
   }
 
   /* 세그먼트 컨트롤 — 홈이 파인 트랙 위에 선택만 흰 면으로 떠오른다 */
@@ -140,23 +144,86 @@ body {
     @apply inline-flex items-center rounded-[11px] bg-gray-100 p-[3px];
   }
   .seg {
-    /* 모바일 터치 타깃 — 40px 밑으로 내리지 않는다 */
-    @apply min-h-[40px] rounded-[9px] px-3.5 text-[13px] font-bold text-gray-500 transition-colors hover:text-gray-900;
+    /* 모바일 터치 타깃 — 40px 밑으로 내리지 않는다. 회색 트랙 위 글자는 gray-600(6.87:1) — gray-500은 4.39:1로 AA 미달 */
+    @apply min-h-[40px] rounded-[9px] px-3.5 text-[13px] font-bold text-gray-600 transition-colors hover:text-gray-900;
   }
   .seg-on {
     @apply bg-white text-gray-900 shadow-sm hover:text-gray-900;
   }
-}
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  /* 태그 알약 — 뉴스 카드·리더·입찰 분야가 같은 모양 */
+  .pill-tag {
+    @apply inline-flex items-center rounded-full bg-[#FFF4D6] px-2.5 py-[3px] text-[12px] font-bold text-[#8A6400];
+  }
+
+  /* 선정 근거 — '근거' 라벨 뒤에 붙는 회색 조각들 (뉴스·입찰 공용) */
+  .reason-label {
+    @apply text-[12px] font-bold text-gray-600;
+  }
+  .reason-chip {
+    @apply rounded-md bg-gray-50 px-1.5 py-0.5 text-[12px] font-medium text-gray-600;
+  }
+
+  /* 필터 묶음 이름 — 기간·정렬·상태 */
+  .group-label {
+    @apply shrink-0 text-[12.5px] font-bold text-gray-600;
+  }
+
+  /* 보조 버튼 — 더 보기·조건 넓히기·표로 보기 */
+  .btn-soft {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-gray-100 px-5 text-[14px] font-bold text-gray-800 transition-colors hover:bg-gray-200 active:bg-gray-200;
+  }
+
+  /* 큰 행동 버튼 — 리더 원문·목록, 404·오류 화면 */
+  .btn-lg {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl px-4 text-[15px] font-bold transition-colors;
+  }
+  .btn-lg-kb {
+    @apply bg-[#FFB81C] text-gray-900 hover:bg-[#F5AE0F] active:bg-[#F5AE0F];
+  }
+  .btn-lg-dark {
+    @apply bg-gray-900 text-white hover:bg-black active:bg-black;
+  }
+  .btn-lg-gray {
+    @apply bg-gray-100 text-gray-800 hover:bg-gray-200 active:bg-gray-200;
+  }
+
+  /* 검색창 — 뉴스·입찰 공용. 쉴 때도 입력 칸으로 보이게 옅은 면과 테두리 */
+  .search-box {
+    @apply flex min-w-0 items-center rounded-xl bg-gray-50 pl-2 ring-1 ring-inset ring-gray-200 transition-shadow focus-within:bg-white focus-within:ring-2 focus-within:ring-[#FFB81C];
+  }
+  .search-input {
+    @apply min-h-[48px] w-full min-w-0 bg-transparent px-2.5 text-[16px] font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-500;
+  }
+  .search-btn {
+    @apply min-h-[44px] shrink-0 rounded-lg px-3 text-[15px] font-bold text-gray-700 hover:text-[#7A5E08];
+  }
+  .search-clear {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 hover:text-gray-900 active:bg-gray-100;
+  }
+
+  /* 목록 오류 상자 */
+  .error-box {
+    @apply rounded-xl border-l-4 border-rose-600 bg-rose-50 px-4 py-6 text-center;
+  }
+  .btn-retry {
+    @apply mt-3 inline-flex min-h-[44px] items-center rounded-full border border-rose-300 bg-white px-5 text-[14px] font-bold text-rose-800 active:bg-rose-100;
+  }
+
+  /* 모바일에서 기간·정렬 묶음을 한 줄 요약으로 접는 버튼.
+     카드 폭 가득 + 카드가 overflow-hidden이라 포커스 링을 안쪽에 그린다. 접힌 동안은 버튼이 카드
+     맨 아래라 아래 모서리를 카드 안쪽 반지름(18px − 테두리 1px)과 동심으로 — 링 모서리가 잘리지 않는다.
+     위쪽은 각지게 둬야 구분선(border-t)이 끝에서 휘지 않는다 */
+  .filter-toggle {
+    @apply flex min-h-[48px] w-full items-center justify-between gap-3 border-t border-[var(--line)] px-3 text-left active:bg-gray-50 focus-visible:-outline-offset-4 focus-visible:rounded-t-none focus-visible:rounded-b-[17px] aria-expanded:focus-visible:rounded-b-none sm:hidden;
   }
 }
 
 /* 리더 뷰 본문 타이포그래피 (가독성 우선) */
 .article-body {
-  font-size: 17px;
+  /* 리더가 <article>에 --reader-scale을 건다. 변수만 바꾸므로 아래 인쇄 규칙(10.5pt)이
+     소스 순서로 여전히 이긴다 — 인라인 font-size였다면 인쇄에서도 화면 배율이 남았다 */
+  font-size: calc(17px * var(--reader-scale, 1));
   line-height: 1.9;
   color: #2a2a2a;
 }
@@ -171,6 +238,15 @@ body {
   font-weight: 800;
   line-height: 1.35;
   color: #111;
+}
+.article-body h2 {
+  font-size: 1.25em;
+}
+.article-body h3 {
+  font-size: 1.12em;
+}
+.article-body h4 {
+  font-size: 1.04em;
 }
 .article-body {
   overflow-wrap: break-word;
@@ -187,13 +263,25 @@ body {
   max-width: 100%;
   overflow-x: auto;
 }
+.article-body th,
+.article-body td {
+  padding: 0.4em 0.6em;
+  border: 1px solid #e5e7eb;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+.article-body th {
+  background: #f9fafb;
+  font-weight: 700;
+}
 .article-body figure {
   margin: 1.4em 0;
 }
 .article-body figcaption {
   margin-top: 0.5em;
-  font-size: 13px;
-  color: #888;
+  font-size: max(12.5px, 0.82em);
+  color: #4b5563;
+  line-height: 1.6;
   text-align: center;
 }
 .article-body blockquote {
@@ -203,16 +291,31 @@ body {
   color: #555;
 }
 .article-body a {
-  color: #9a7a12;
+  color: #7a5e08;
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .article-body ul,
 .article-body ol {
   margin: 0 0 1.15em;
   padding-left: 1.4em;
 }
+/* Tailwind preflight가 목록 기호를 지운다 — 원문 목록이 문단처럼 보이지 않게 되살린다 */
+.article-body ul {
+  list-style: disc;
+}
+.article-body ol {
+  list-style: decimal;
+}
+.article-body li::marker {
+  color: #8a6400;
+}
 .article-body li {
   margin: 0.3em 0;
+}
+.article-body blockquote > :last-child,
+.article-body li > :last-child {
+  margin-bottom: 0;
 }
 
 /* 프리미엄 디테일 */
@@ -228,19 +331,38 @@ button {
     box-shadow 0.2s ease,
     transform 0.2s ease;
 }
-/* 스크롤 시 sticky 헤더 가독성 위해 부드러운 포커스 링 */
+/* 모바일 탭 시 번쩍이는 파란 하이라이트 제거 — 눌림 피드백은 각 요소의 active 상태가 맡는다 */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+/* 키보드 포커스 링 — 파란 기본값 대신 사이트 잉크색 하나만 쓴다. 입력창은 링 대신 감싸는 상자가
+   KB 옐로우로 강조된다(focus-within). 입력창은 클릭만으로도 focus-visible이 걸려
+   검색창에 굵은 파란 테두리가 뜨던 문제. */
 :focus-visible {
-  outline: 3px solid #1d4ed8;
+  outline: 2px solid #1f2937;
   outline-offset: 2px;
-  border-radius: 4px;
+}
+/* 모서리 없는 요소(GNB 링크 등)만 부드럽게 — :where는 명시도 0이라 rounded-* 유틸리티가 이긴다 */
+:where(:focus-visible) {
+  border-radius: 6px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 /* 어두운 면 위에서는 흰 링으로 전환 */
-.bg-gray-900 :focus-visible,
-.sheet-dark :focus-visible {
+.bg-gray-900 :focus-visible {
   outline-color: #ffffff;
 }
+/* 브라우저 기본 파란 ✕ 대신 각 화면의 지우기 버튼을 쓴다 */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* 화면 위에 붙어 있는 건 GNB 줄(~50px)뿐이다 */
 #main-content {
-  scroll-margin-top: 96px;
+  scroll-margin-top: 56px;
 }
 
 /* ------------------------------------------------------------------ *
@@ -262,45 +384,7 @@ button {
     background: #fff;
   }
 
-  /* 지면은 카드 장식 없이 종이 그대로 */
-  .sheet {
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-  }
-  .sheet-head {
-    border-bottom: 1.5pt solid #111;
-    padding-bottom: 4mm;
-  }
-  .sheet-foot {
-    border-top: 0.5pt solid #999;
-    padding-top: 3mm;
-  }
-
-  /* 기사 블록은 페이지 중간에서 잘리지 않게 */
-  .brief-item {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    padding: 3.5mm 0;
-    border-bottom: 0.5pt solid #ddd;
-  }
-  .brief-item:last-child {
-    border-bottom: 0;
-  }
-  .brief-note {
-    border-left: 2pt solid #111;
-    padding-left: 2.5mm;
-  }
-
   /* 리더 본문 인쇄 — 화면용 장식을 걷어낸다 */
-  .print-article {
-    break-inside: auto;
-    break-after: page;
-  }
-  .print-article:last-child {
-    break-after: auto;
-  }
   .article-body {
     font-size: 10.5pt;
     line-height: 1.55;

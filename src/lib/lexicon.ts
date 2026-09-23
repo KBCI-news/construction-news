@@ -129,6 +129,33 @@ export const KIND_LABELS: Record<KindId, string> = {
 
 export const LEGAL_KINDS: KindId[] = ["regulation", "legislation", "judgment"];
 
+/**
+ * 뉴스 화면 태그에 대응하는 데스크와 그 표기. 카드 알약은 데스크 원래 이름이
+ * 아니라 담당자가 고르는 태그 이름으로 보여준다 — 태그는 "KB금융"인데 카드는
+ * "KB·자사"처럼 서로 다른 말이 섞이면 같은 것인지 헷갈린다.
+ * 순서는 카드에 하나만 보일 때의 우선순위다.
+ */
+export const TAG_LABEL_BY_DESK: Partial<Record<DeskId, string>> = {
+  collection: "채권추심",
+  survey: "임대차/권리조사",
+  edoc: "전자문서",
+  peers: "신용정보업권",
+  own: "KB금융",
+};
+
+export const TAG_DESKS: string[] = Object.keys(TAG_LABEL_BY_DESK);
+
+/** 카드에 붙일 태그 이름 — 태그 체계 밖 데스크만 걸린 기사는 법/정책이거나 없음 */
+export function tagLabelOf(item: { desks: string[]; kinds: string[] }): string | undefined {
+  for (const d of TAG_DESKS) {
+    if (item.desks.includes(d)) return TAG_LABEL_BY_DESK[d as DeskId];
+  }
+  if (item.desks.length > 0 && item.kinds.some((k) => (LEGAL_KINDS as string[]).includes(k))) {
+    return "법/정책";
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // 키워드 사전
 //   tier 0~3 = 업무 근접도 (0이 가장 가깝다)
@@ -146,6 +173,12 @@ export type Term = {
    * (금감원 언급만으로 업무 근접 T0가 되면 모든 당국 기사가 과대평가된다)
    */
   authOnly?: boolean;
+  /**
+   * 문맥 필수어. 제목이나 요약에 이 중 하나가 함께 있어야 term으로 인정한다.
+   * 단어 자체는 여러 분야에 두루 쓰이지만 우리 업무와 겹칠 때만 의미가 있는
+   * term에 쓴다 — 특사경은 식품·환경·원산지 단속이 대부분이다.
+   */
+  requires?: string[];
 };
 
 // 티어별 폴링 주기(분). 쿼리 사전과 판정 사전을 분리해, 사전을 3배로 늘리면서도
@@ -164,6 +197,19 @@ const t = (
   query = false,
 ): Term => ({ term, tier, desk, query });
 
+/**
+ * 대부업·채권추심 문맥 — 특사경 기사가 우리 업무일 때만 인정하는 근거.
+ * 공백·구두점을 지운 뒤 부분문자열로 찾으므로 짧은 말은 경계를 넘어 붙는다:
+ * '대부'→대부분, '사채'→회사채, '사금융'→"건설사 금융"·"수사… 금융",
+ * '고금리'→"지원하고 금리", '내구제'→"기한 내 구제". 긴 형태만 쓴다.
+ * (30일치 특사경 기사 116건 라벨링으로 검증)
+ */
+const LENDING_CONTEXT = [
+  "대부업", "불법대부", "미등록대부", "무등록대부", "대부중개", "대부광고",
+  "추심", "불법사금융", "불법사채", "사채업자", "고리대", "고금리대출",
+  "법정최고금리", "이자제한", "불법대출", "작업대출", "내구제대출", "폰테크",
+];
+
 export const TERMS: Term[] = [
   // --- collection : 채권추심 ---
   t("채권추심", 0, "collection", true),
@@ -179,9 +225,11 @@ export const TERMS: Term[] = [
   t("채권추심 가이드라인", 0, "collection", true),
   t("매입채권추심", 0, "collection", true),
   t("추심위탁", 1, "collection", true),
-  // 불법사금융·금융범죄 단속 주체 — 법/정책 태그에서 함께 잡힌다
-  t("특별사법경찰", 1, "collection", true),
-  t("특사경", 1, "collection"),
+  // 특사경은 대부업·추심 단속일 때만 — 식품·환경·원산지 단속 기사가
+  // 채권추심에 오르던 문제(30일치 116건 중 41건). 수집은 따로 하지 않는다:
+  // '대부업'·'불법사금융' 쿼리가 이미 이 기사들을 가져온다.
+  { term: "특별사법경찰", tier: 1, desk: "collection", requires: LENDING_CONTEXT },
+  { term: "특사경", tier: 1, desk: "collection", requires: LENDING_CONTEXT },
   // 추심 물량·회수 실무와 직결되는 법제 — 법/정책 태그에서도 함께 잡힌다
   t("개인채무자보호법", 0, "collection", true),
   t("대부업법", 1, "collection", true),
@@ -191,7 +239,14 @@ export const TERMS: Term[] = [
   t("감면", 2, "collection"),
   t("채권양도", 1, "collection", true),
   t("소멸시효", 1, "collection", true),
-  t("지급명령", 1, "collection", true),
+  // 법원 독촉절차의 지급명령만 — "체불임금 지급 명령"(노동부 행정명령)이 걸렸다
+  {
+    term: "지급명령",
+    tier: 1,
+    desk: "collection",
+    query: true,
+    requires: ["채권", "채무", "독촉", "법원", "소송", "추심", "대여금", "이의신청"],
+  },
   t("채권압류", 1, "collection", true),
   t("강제집행", 1, "collection", true),
   t("대부업", 1, "collection", true),
@@ -458,11 +513,12 @@ export const TERMS: Term[] = [
 export const QUERY_TERMS: Term[] = TERMS.filter((x) => x.query);
 
 // 정규화 캐시 — 매 기사마다 사전을 재정규화하지 않는다
-export type PreparedTerm = Term & { norm: string };
+export type PreparedTerm = Term & { norm: string; requiresNorms?: string[] };
 
 export const PREPARED_TERMS: PreparedTerm[] = TERMS.map((x) => ({
   ...x,
   norm: nfm(x.term),
+  requiresNorms: x.requires?.map(nfm),
 }));
 
 // ---------------------------------------------------------------------------
@@ -582,7 +638,8 @@ export const TERM_COLLISIONS: { term: string; voidedBy: string[] }[] = [
   { term: "기부", voidedBy: ["등기부", "기부채납", "기부채무"] },
   { term: "수상", voidedBy: ["수상한", "수상스키", "수상운송"] },
   // 증시 "공매도"는 자산 처분 절차인 "공매"와 무관하다
-  { term: "공매", voidedBy: ["공매도"] },
+  // "공공매입"(농지·임대주택 매입)이 공백 제거 후 '공매'를 품는다
+  { term: "공매", voidedBy: ["공매도", "공공매입", "공공매각"] },
   // 기관명 안의 "서민금융"이 대출 데스크를 켜던 문제 — 진흥원 인사·노조
   // 기사가 대출 뉴스로 올라왔다. 기관명 밖에서 따로 등장할 때만 인정한다.
   { term: "서민금융", voidedBy: ["서민금융진흥원", "서민금융연구원", "서민금융硏"] },

@@ -172,7 +172,7 @@ footer.doc { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 1
   <p class="eyebrow">KBCI 뉴스룸 · 정보 구조</p>
   <h1>뉴스 태그 IA</h1>
   <p class="lede">뉴스 탭의 태그 8종이 각각 어떤 조건으로 기사를 고르는지, 그 밑에서 어떤 키워드 사전이 수집·판정을 담당하는지 정리한 기준 문서. 태그·키워드 조정 논의의 출발점으로 쓴다.</p>
-  <p class="asof">2026-09-22 기준</p>
+  <p class="asof">2026-09-23 기준</p>
 </header>
 
 <h2>한눈에 보기</h2>
@@ -181,7 +181,7 @@ footer.doc { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 1
 <table>
   <thead><tr><th>태그</th><th>URL</th><th>피드 조건</th></tr></thead>
   <tbody>
-    <tr><td class="tagname">전체</td><td><span class="mono">/</span></td><td>조건 없음 — 아카이브 전체(30일 보존), 같은 사건은 대표 기사 1건만</td></tr>
+    <tr><td class="tagname">전체</td><td><span class="mono">/</span></td><td>아래 7개 태그의 <b>합집합</b> — 태그 체계 밖(정보보호·부실채권 등)만 걸린 기사와 태그 없는 일반 뉴스는 제외(검색으로만 닿는다). 같은 사건은 대표 기사 1건만</td></tr>
     <tr><td class="tagname">채권추심</td><td><span class="mono">?tag=collection</span></td><td>데스크 = 채권추심</td></tr>
     <tr><td class="tagname">법/정책</td><td><span class="mono">?tag=legal</span></td><td>사건종류 ∈ {감독·제재, 입법·개정, 판결} <b>그리고</b> 업무 데스크 소속 기사만(무관한 일반 법조 기사 제외)</td></tr>
     <tr><td class="tagname">전자문서</td><td><span class="mono">?tag=edoc</span></td><td>데스크 = 전자문서</td></tr>
@@ -226,22 +226,23 @@ footer.doc { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 1
   <div class="termgroup"><p>관련 T1</p>
     <ul class="chips">
       <li class="q">대부업법</li><li class="q">포용금융</li><li class="q">채무 감면</li>
-      <li class="q">추심위탁</li><li class="q">특별사법경찰</li><li class="q">채권양도</li>
+      <li class="q">추심위탁</li><li class="q">채권양도</li>
       <li class="q">소멸시효</li><li class="q">지급명령</li><li class="q">채권압류</li>
       <li class="q">강제집행</li><li class="q">대부업</li><li class="q">불법사금융</li>
       <li class="q">채무자대리인</li><li class="q">추심 유예</li><li class="q">민사집행법</li>
-      <li>추심</li><li>특사경</li><li>시효중단</li><li>시효연장</li><li>가압류</li>
+      <li>추심</li><li>특별사법경찰 · 특사경 *</li><li>시효중단</li><li>시효연장</li><li>가압류</li>
       <li>대위변제</li><li>구상권</li><li>채권양도통지</li><li>추심수수료</li>
       <li>무담보채권</li><li>담보부채권</li><li>채무불이행자</li><li>추심연락</li>
       <li>상거래채권</li><li>채권관리</li><li>대부채권 매각</li><li>감면</li>
     </ul>
   </div>
   <p class="hint">"감면" 단독은 세금·통행료 기사 오염이 커서 주변(T2)으로 두고, 같은 데스크 근거가 함께 있을 때만 태깅한다. 수집은 "채무 감면"이 담당.</p>
+  <p class="hint">* 특별사법경찰·특사경은 <b>대부업·추심 단속일 때만</b> 인정한다 — 대부업·불법추심·불법사금융·미등록대부·고금리대출 등 문맥어가 제목에 있거나, 요약에 서로 떨어진 근거가 두 곳 이상 있어야 한다("부동산·대부업·식품·환경…" 같은 단속 분야 나열 속 한 단어는 근거가 아니다). 식품·환경·원산지 단속 기사는 채권추심에 오르지 않는다. 30일치 116건 라벨링 검증: 오탐 41→1건, 누락 0건. 지급명령도 법원 독촉절차 문맥(채권·채무·독촉·법원·소송 등)일 때만 인정.</p>
 </section>
 
 <section class="tag">
   <h3><span class="tagpill">법/정책</span><span class="cond"><code>kind=regulation·legislation·judgment</code> + <code>scope=curated</code></span></h3>
-  <p class="hint">회사와 관련될 법 개정·제재·판결. 특정 키워드 목록이 아니라 <b>사건종류 축</b>으로 잡는다 — 어느 데스크 소속이든 법령·제재·판결 기사면 들어오고, 업무 데스크에 전혀 안 걸린 일반 법조 기사는 걸러진다. 채권추심법·개인채무자보호법·대부업법·감면·포용금융 관련 법령 기사는 채권추심 축 키워드로 수집돼 여기에도 잡히고, 노란봉투법·근로자추정제·특별사법경찰 같은 노동·단속 입법은 아래 노동 축 키워드가 보강한다.</p>
+  <p class="hint">회사와 관련될 법 개정·제재·판결. 특정 키워드 목록이 아니라 <b>사건종류 축</b>으로 잡는다 — 어느 데스크 소속이든 법령·제재·판결 기사면 들어오고, 업무 데스크에 전혀 안 걸린 일반 법조 기사는 걸러진다. 채권추심법·개인채무자보호법·대부업법·감면·포용금융 관련 법령 기사는 채권추심 축 키워드로 수집돼 여기에도 잡히고, 노란봉투법·근로자추정제 같은 노동 입법과 대부업·불법추심 특별사법경찰(특사경) 단속은 아래 노동 축 키워드가 보강한다.</p>
   <div class="termgroup"><p>노동 축 보강 키워드 (T1)</p>
     <ul class="chips">
       <li class="q">근로기준법</li><li class="q">노란봉투법</li><li class="q">근로자추정제</li>

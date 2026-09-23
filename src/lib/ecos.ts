@@ -146,22 +146,8 @@ export const ECOS_SERIES: EcosSeries[] = [
     min: 0.5,
     max: 15,
   },
-  {
-    key: "cpi_yoy",
-    label: "소비자물가 상승률",
-    unit: "%",
-    sortOrder: 8,
-    statCode: "901Y009", // 소비자물가지수(2020=100)
-    itemCodes: ["0"], // 총지수 — 확인값 2026-07 119.77
-    cycle: "M",
-    span: 24,
-    transform: "yoy", // 지수 → 전년동월비
-    digits: 1,
-    expectName: /소비자물가지수[\s\S]*총지수/,
-    expectUnit: /2020=100/,
-    min: -5,
-    max: 15,
-  },
+  // 소비자물가 상승률(cpi_yoy)은 KOSIS 발표 등락률로 옮겼다(src/lib/kosis.ts).
+  // 901Y009 지수로 직접 계산한 전년동월비는 발표치와 0.1%p씩 어긋나는 달이 있었다.
   {
     key: "usd_krw",
     label: "원/달러 환율",

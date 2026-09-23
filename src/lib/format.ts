@@ -29,7 +29,19 @@ export const formatRelative = (pubDate: string): string => {
   return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 };
 
-export const dateGroupOf = (pubDate: string): string => {
+export const formatDateTime = (pubDate: string): string => {
+  const d = new Date(pubDate);
+  if (Number.isNaN(d.getTime())) return pubDate;
+  return d.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+export const dateGroupOf =(pubDate: string): string => {
   const d = new Date(pubDate);
   if (Number.isNaN(d.getTime())) return "이전";
   const now = new Date();

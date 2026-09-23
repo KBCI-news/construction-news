@@ -9,7 +9,7 @@ function BrandLogo() {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFB81C] text-[15px] font-extrabold tracking-tight text-gray-900">
+      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-[#FFB81C] text-[15px] font-extrabold tracking-tight text-gray-900">
         KB
       </div>
     );
@@ -18,8 +18,10 @@ function BrandLogo() {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/kb-logo.png"
-      alt="KB"
-      className="h-9 w-auto"
+      alt=""
+      width={48}
+      height={34}
+      className="h-[34px] w-auto"
       onError={() => setFailed(true)}
     />
   );
@@ -37,39 +39,43 @@ export function Header() {
 
   return (
     // backdrop-blur는 모바일 스크롤 프레임을 깎아 먹는다 — 불투명 배경으로 충분
-    <header className="no-print sticky top-0 z-30 border-b border-[var(--line)] bg-white shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)]">
+    // 3px 띠 + 56px 로고 줄(=59px)은 스크롤로 사라지고 GNB 줄만 붙는다 — 112px 전체를 붙이면 폰 화면의 13%를 먹는다
+    <header className="no-print sticky top-[-59px] z-30 border-b border-[var(--line)] bg-white shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)]">
       <div className="h-[3px] w-full bg-gradient-to-r from-[#FFB81C] to-[#FFD37A]" />
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
-        <div className="flex items-center justify-between py-3">
+        <div className="flex h-[56px] items-center">
           <Link href="/" className="flex items-center gap-2.5">
             <BrandLogo />
             <div className="leading-tight">
               <p className="text-[17px] font-extrabold tracking-tight text-gray-900">
                 KBCI 뉴스룸
               </p>
-              <p className="text-[11px] text-gray-600">
+              <p className="text-[12px] text-gray-600">
                 KB신용정보 뉴스 모니터링
               </p>
             </div>
           </Link>
         </div>
 
-        <nav aria-label="주요 섹션" className="flex gap-1 overflow-x-auto pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav aria-label="주요 섹션" className="grid grid-cols-3 pb-px sm:flex sm:gap-1">
           {SECTIONS.map((item) => {
+            // 기사 읽기는 뉴스의 하위 화면
             const active =
-              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              item.href === "/"
+                ? pathname === "/" || pathname.startsWith("/read")
+                : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative shrink-0 px-3 py-2.5 text-[14px] font-bold tracking-tight transition-colors ${
+                className={`relative flex min-h-[48px] items-center justify-center px-3 text-[15px] font-bold tracking-tight transition-colors active:bg-gray-50 sm:justify-start sm:text-[14px] ${
                   active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
                 {item.label}
                 {active && (
-                  <span className="absolute inset-x-2.5 -bottom-px h-[3px] rounded-full bg-[#FFB81C]" />
+                  <span className="absolute inset-x-4 -bottom-px h-[3px] rounded-full bg-[#FFB81C] sm:inset-x-2.5" />
                 )}
               </Link>
             );
