@@ -35,7 +35,26 @@ export type KosisSeries = {
 };
 
 // 프로브로 코드를 확정한 뒤에만 추가한다. 빈 목록이면 크론은 아무것도 쓰지 않는다.
-export const KOSIS_SERIES: KosisSeries[] = [];
+export const KOSIS_SERIES: KosisSeries[] = [
+  {
+    // 국가데이터처(옛 통계청) 발표 등락률 그대로. ECOS 지수(소수 둘째 자리)로
+    // 직접 계산하면 발표치와 0.1%p씩 어긋나는 달이 있었다.
+    // 확인값(2026-09-23 프로브): 2024.10 1.3 / 2024.12 1.9 / 2025.3 2.1 / 2026.8 3.1
+    key: "cpi_yoy",
+    label: "소비자물가 상승률",
+    unit: "%",
+    sortOrder: 8,
+    orgId: "101",
+    tblId: "DT_1J22042", // 월별 소비자물가 등락률
+    params: { itmId: "T03", objL1: "0" }, // 전년동월비(%) · 총지수
+    prdSe: "M",
+    span: 24,
+    expectName: /월별 소비자물가 등락률[\s\S]*전년동월비[\s\S]*총지수/,
+    digits: 1,
+    min: -5,
+    max: 15,
+  },
+];
 
 export const hasKosisKey = (): boolean => Boolean(process.env.KOSIS_API_KEY);
 
@@ -65,27 +84,29 @@ export async function kosisRaw(
   return kosisFetch(path, params);
 }
 
-/** KOSIS 기간 표기(YYYYMM / YYYYQn? / YYYY) → ISO(KST 말일 자정) */
+/**
+ * KOSIS 기간 표기(YYYYMM / YYYY0n / YYYY) → ISO(기간 첫날 KST 자정).
+ * ECOS(ecosTimeToIso)와 같은 규칙이어야 한다 — 경제지표 화면은 "월 1일"을
+ * 그 달 통계로, "분기 첫 달 1일"을 그 분기 통계로 읽는다.
+ */
 export function kosisPeriodToIso(prd: string, prdSe: "M" | "Q" | "Y"): string | null {
   const t = prd.trim();
+  let y: number;
+  let m: number;
   if (prdSe === "M" && /^\d{6}$/.test(t)) {
-    const y = +t.slice(0, 4);
-    const m = +t.slice(4, 6);
+    y = +t.slice(0, 4);
+    m = +t.slice(4, 6);
     if (m < 1 || m > 12) return null;
-    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    return new Date(Date.UTC(y, m - 1, lastDay) - 9 * 3_600_000).toISOString();
+  } else if (prdSe === "Q" && /^\d{4}0[1-4]$/.test(t)) {
+    y = +t.slice(0, 4);
+    m = (+t.slice(5, 6) - 1) * 3 + 1;
+  } else if (prdSe === "Y" && /^\d{4}$/.test(t)) {
+    y = +t;
+    m = 1;
+  } else {
+    return null;
   }
-  if (prdSe === "Q" && /^\d{4}0[1-4]$/.test(t)) {
-    const y = +t.slice(0, 4);
-    const q = +t.slice(5, 6);
-    const m = q * 3;
-    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    return new Date(Date.UTC(y, m - 1, lastDay) - 9 * 3_600_000).toISOString();
-  }
-  if (prdSe === "Y" && /^\d{4}$/.test(t)) {
-    return new Date(Date.UTC(+t, 11, 31) - 9 * 3_600_000).toISOString();
-  }
-  return null;
+  return new Date(Date.UTC(y, m - 1, 1) - 9 * 3_600_000).toISOString();
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");

@@ -25,7 +25,7 @@ type HistRow = { key: string; value: number; as_of: string; source_kind?: string
 const OFFICIAL_HOSTS: Record<string, string> = {
   "ecos.bok.or.kr": "한국은행",
   "fisis.fss.or.kr": "금융감독원",
-  "kosis.kr": "KOSIS",
+  "kosis.kr": "국가데이터처",
 };
 
 export async function GET() {
