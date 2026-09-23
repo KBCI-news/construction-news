@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Indicator } from "@/app/api/indicators/route";
 import { ECOS_SERIES } from "@/lib/ecos";
+import { KOSIS_SERIES } from "@/lib/kosis";
 
 // ---------------------------------------------------------------------------
 // 구성
@@ -91,20 +92,35 @@ const ecosSeriesOf = (it: Indicator) =>
  * 원본 계열의 발표 주기. 점 간격으로 짐작하면 점이 한두 개뿐일 때(추이 조회 실패 포함)
  * 저장 날짜("6월 1일", 분기면 첫 달)가 그대로 기준일로 찍힌다.
  */
+const KOSIS_BY_KEY = new Map(KOSIS_SERIES.map((s) => [s.key, s]));
+
+/** 국가데이터처(KOSIS)에서 받은 지표 — 출처 표기는 /api/indicators의 OFFICIAL_HOSTS와 같아야 한다 */
+const kosisSeriesOf = (it: Indicator) =>
+  it.sourceKind === "official" && it.sourceLabel === "국가데이터처"
+    ? KOSIS_BY_KEY.get(it.key)
+    : undefined;
+
 function knownCadence(it: Indicator): Cad | null {
   const s = ecosSeriesOf(it);
-  if (!s) return null;
-  if (s.cycle === "D") return s.downsample === "month" ? "monthEnd" : "daily";
-  if (s.cycle === "M") return "monthly";
-  if (s.cycle === "Q") return "quarterly";
+  if (s) {
+    if (s.cycle === "D") return s.downsample === "month" ? "monthEnd" : "daily";
+    if (s.cycle === "M") return "monthly";
+    if (s.cycle === "Q") return "quarterly";
+    return null;
+  }
+  // KOSIS도 ECOS와 같이 기간 첫날에 저장한다(kosisPeriodToIso)
+  const k = kosisSeriesOf(it);
+  if (k?.prdSe === "M") return "monthly";
+  if (k?.prdSe === "Q") return "quarterly";
   return null;
 }
 
 /**
  * 싣지 않는 지표. ECOS 지수에서 우리가 계산한 전년동월비(transform: "yoy")는
- * 소수 둘째 자리 지수로 다시 계산해 반올림한 값이라 통계청 발표 상승률과
- * 0.1%p씩 어긋나는 달이 있다(2024.10 계산 1.2 / 발표 1.3, 2024.12 2.0 / 1.9,
- * 2025.3 2.0 / 2.1). 발표 등락률(KOSIS 등)로 받게 되면 출처가 바뀌어 자동으로 다시 보인다.
+ * 소수 둘째 자리 지수로 다시 계산해 반올림한 값이라 발표 상승률과 0.1%p씩
+ * 어긋나는 달이 있다(2024.10 계산 1.2 / 발표 1.3). 소비자물가 상승률은 이제
+ * 국가데이터처 발표 등락률(KOSIS)로 받으므로 걸리지 않는다 — 전환 직후
+ * DB에 ECOS 값이 남아 있는 동안만 이 규칙이 가린다.
  */
 const publishable = (it: Indicator) => ecosSeriesOf(it)?.transform !== "yoy";
 
@@ -429,12 +445,13 @@ function prepare(it: Indicator): Prepared {
 
 /** 헤더가 실제로 화면 위에 붙어 있는지. sticky여도 조상에 overflow가 걸리면 같이 스크롤돼 사라진다 */
 function headerPinned(h: HTMLElement): boolean {
-  const pos = getComputedStyle(h).position;
-  if (pos === "fixed") return true;
-  if (pos !== "sticky") return false;
+  const cs = getComputedStyle(h);
+  if (cs.position === "fixed") return true;
+  if (cs.position !== "sticky") return false;
   const r = h.getBoundingClientRect();
   if (r.bottom <= 0) return false; // 이미 스크롤돼 사라졌다
-  if (window.scrollY > r.height + 1) return r.top > -1; // 헤더 높이보다 더 내려왔는데 맨 위에 있다
+  // 헤더 높이보다 더 내려왔는데 sticky top 자리에 있다 — top을 음수로 둬 GNB만 붙는 헤더도 '붙어 있음'
+  if (window.scrollY > r.height + 1) return Math.abs(r.top - (parseFloat(cs.top) || 0)) < 1;
   // 아직 맨 위 근처라 위치로는 알 수 없다 — 조상 중 스크롤 컨테이너가 있으면 붙지 않는다
   const root = document.documentElement;
   const clips = (el: Element) => {
@@ -803,7 +820,7 @@ function TrendChart({ p, open }: { p: Prepared; open: boolean }) {
       </div>
 
       <div
-        className={`flex min-h-[62px] items-center justify-between gap-2 rounded-xl py-2 pl-3 pr-2 ${
+        className={`flex min-h-[88px] items-center justify-between gap-2 rounded-xl py-2 pl-3 pr-2 ${
           picked ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-800"
         }`}
       >
@@ -811,19 +828,17 @@ function TrendChart({ p, open }: { p: Prepared; open: boolean }) {
           <p className={`text-[14px] ${picked ? "text-gray-300" : "text-gray-600"}`}>
             {picked ? "선택한 시점" : restLabel}
           </p>
-          <p className="text-[15px] tabular-nums">
-            {whenLong(shown)}{" "}
-            <b className="font-extrabold">
-              {fmtNum(shown.value, dec)}
-              {unit}
-            </b>
+          <p className="text-[15px] tabular-nums">{whenLong(shown)}</p>
+          <p className="text-[17px] font-extrabold tabular-nums">
+            {fmtNum(shown.value, dec)}
+            {unit}
           </p>
         </div>
         {picked && (
           <button
             type="button"
             onClick={() => setSel(null)}
-            className="h-11 shrink-0 rounded-lg border border-white/40 px-3 text-[14px] font-bold text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FFB81C]"
+            className="h-11 shrink-0 rounded-lg border border-white/40 px-3 text-[14px] font-bold text-white hover:bg-white/10 active:bg-white/10"
           >
             {p.droppedLatest ? "마지막 값 보기" : "최근 값 보기"}
           </button>
@@ -836,6 +851,13 @@ function TrendChart({ p, open }: { p: Prepared; open: boolean }) {
           기사마다 수치가 달라 그래프에서 뺐습니다.
         </p>
       )}
+
+      <p className="flex items-start gap-1.5 text-[14px] text-gray-600">
+        <span className="mt-[3px]">
+          <InfoIcon />
+        </span>
+        그래프를 누르거나 옆으로 밀면 그 시점의 값이 위{"\u00a0"}칸에 나옵니다.
+      </p>
 
       <div ref={boxRef}>
         <svg
@@ -962,13 +984,6 @@ function TrendChart({ p, open }: { p: Prepared; open: boolean }) {
           )}
         </svg>
       </div>
-
-      <p className="flex items-start gap-1.5 text-[14px] text-gray-600">
-        <span className="mt-[3px]">
-          <InfoIcon />
-        </span>
-        그래프를 누르거나 옆으로 밀면 그 시점의 값이 위 칸에 나옵니다.
-      </p>
     </div>
   );
 }
@@ -987,20 +1002,27 @@ function HistoryTable({ p, id }: { p: Prepared; id: string }) {
         <caption className="sr-only">{p.label} 시점별 값</caption>
         <thead>
           <tr className="border-b border-[var(--line)] text-[14px] text-gray-500">
-            <th scope="col" className="py-2 pr-2 text-left font-bold">
+            <th scope="col" className="whitespace-nowrap py-2 pr-2 text-left font-bold">
               시점
             </th>
-            <th scope="col" className="px-2 py-2 text-right font-bold">
+            <th scope="col" className="whitespace-nowrap px-2 py-2 text-right font-bold">
               값{unit ? `(${unit})` : ""}
             </th>
+            {/* 좁은 화면(360)에서 일별 날짜가 "9월 / 22일"로 쪼개지지 않게, 칸이 모자라면 단위만 둘째 줄로 */}
             <th scope="col" className="py-2 pl-2 text-right font-bold">
-              직전 대비{deltaUnit}
+              <span className="whitespace-nowrap">직전 대비</span>
+              {deltaUnit && (
+                <>
+                  <wbr />
+                  <span className="whitespace-nowrap">{deltaUnit}</span>
+                </>
+              )}
             </th>
           </tr>
         </thead>
         <tbody>
           {rows.map(({ q, prev }, i) => {
-            let delta: React.ReactNode = <span className="text-gray-400">—</span>;
+            let delta: React.ReactNode = <span className="text-gray-500">—</span>;
             if (prev && !q.conflict && !prev.conflict) {
               const diff = Number((q.value - prev.value).toFixed(dec));
               // 반올림된 계열은 방향만 — 폭은 실제와 다를 수 있다
@@ -1023,11 +1045,14 @@ function HistoryTable({ p, id }: { p: Prepared; id: string }) {
                 <td className="py-2 pr-2 text-left text-gray-800">
                   {news ? (
                     <>
-                      {when(q, "irregular", "basis", { refYear: p.refYear })} 보도
-                      <span className="text-[14px] text-gray-500"> 기사 {q.count ?? 1}건</span>
+                      <span className="whitespace-nowrap">
+                        {when(q, "irregular", "basis", { refYear: p.refYear })}
+                      </span>{" "}
+                      보도
+                      <span className="block text-[14px] text-gray-500">기사 {q.count ?? 1}건</span>
                     </>
                   ) : (
-                    when(q, cad)
+                    <span className="whitespace-nowrap">{when(q, cad)}</span>
                   )}
                 </td>
                 <td className="px-2 py-2 text-right font-bold text-gray-900">
@@ -1037,7 +1062,7 @@ function HistoryTable({ p, id }: { p: Prepared; id: string }) {
                     fmtNum(q.value, dec)
                   )}
                 </td>
-                <td className="py-2 pl-2 text-right">{delta}</td>
+                <td className="whitespace-nowrap py-2 pl-2 text-right">{delta}</td>
               </tr>
             );
           })}
@@ -1100,8 +1125,7 @@ function DetailPanel({
     p.news ? `${when(q, "irregular", "basis", { refYear: p.refYear })} 보도` : when(q, p.cad);
   const prevLong = c ? cellWhen(c.prev) : "";
   const tableId = `table-${p.key}`;
-  const btn =
-    "inline-flex h-11 items-center gap-1 rounded-xl border border-[var(--line)] bg-white px-4 text-[15px] font-bold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FFB81C]";
+  const btn = "btn-soft text-[15px]";
 
   return (
     <div
@@ -1132,7 +1156,7 @@ function DetailPanel({
 
             {c && (
               <div>
-                <div className="relative grid grid-cols-2 gap-6 rounded-xl bg-gray-50 p-3">
+                <div className="relative grid grid-cols-2 gap-5 rounded-xl bg-gray-50 p-3">
                   {[
                     { q: c.prev, now: false },
                     { q: c.last, now: true },
@@ -1146,7 +1170,7 @@ function DetailPanel({
                       <p className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap">
                         {now ? <DotMark /> : <RingMark />}
                         <span>
-                          <span className="text-[20px] font-extrabold tabular-nums tracking-tight text-gray-900">
+                          <span className="text-[19px] font-extrabold tabular-nums tracking-tight text-gray-900 min-[375px]:text-[20px]">
                             {fmtNum(q.value, p.dec)}
                           </span>
                           <span className="ml-0.5 text-[14px] font-bold text-gray-500">
@@ -1156,7 +1180,7 @@ function DetailPanel({
                       </p>
                     </div>
                   ))}
-                  <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                  <span className="pointer-events-none absolute left-1/2 top-[23px] -translate-x-1/2 -translate-y-1/2">
                     <Arrow />
                   </span>
                 </div>
@@ -1278,23 +1302,28 @@ function IndicatorRow({
 }) {
   return (
     <li className={open ? "rounded-[18px] bg-[#FFFBF0] ring-2 ring-inset ring-[#FFB81C]" : undefined}>
+      {/* 부모 ul.card가 overflow-hidden이라 링을 안쪽에 — 열림 테두리(노랑) 안쪽의 진한 링으로 포커스와 열림을 구분.
+          닫힌 줄은 카드 폭 가득이라 눌림 배경도 모서리 없이, 열린 줄은 노란 테두리가 가려지지 않게 반투명으로 */}
       <button
         type="button"
         id={`row-${p.key}`}
         aria-expanded={open}
         aria-controls={`panel-${p.key}`}
         onClick={() => onToggle(p.key)}
-        className="grid min-h-[96px] w-full grid-cols-[1fr_auto] gap-x-3 rounded-[18px] px-4 pb-3 pt-3.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#FFB81C]"
+        className={`grid min-h-[96px] w-full grid-cols-[1fr_auto] gap-x-3 px-4 pb-3 pt-3.5 text-left focus-visible:-outline-offset-4 ${
+          open ? "rounded-[18px] active:bg-black/[0.04]" : "active:bg-gray-100"
+        }`}
       >
         <span className="col-start-1 row-start-1 min-w-0 leading-snug">
           <span id={`label-${p.key}`} className="text-[17px] font-bold text-gray-900">
             {p.label}
           </span>
           {p.news && (
-            <span className="ml-1.5 inline-block whitespace-nowrap rounded bg-gray-100 px-1.5 align-[2px] text-[13px] font-bold leading-5 text-gray-600">
+            <span className="ml-1.5 inline-block whitespace-nowrap rounded-md bg-gray-100 px-1.5 align-[2px] text-[13px] font-bold leading-5 text-gray-600">
               기사 추출
             </span>
           )}
+          <span className="sr-only">, </span>
         </span>
         <span className="col-start-2 row-span-2 row-start-1 self-center whitespace-nowrap text-right">
           {p.valueHidden ? (
@@ -1309,8 +1338,12 @@ function IndicatorRow({
               )}
             </>
           )}
+          <span className="sr-only">, </span>
         </span>
-        <span className="col-start-1 row-start-2 text-[14px] text-gray-500">{p.meta}</span>
+        <span className="col-start-1 row-start-2 text-[14px] text-gray-500">
+          {p.meta}
+          <span className="sr-only">, </span>
+        </span>
         <span className="col-span-2 row-start-3 mt-2.5 flex items-center justify-between gap-2">
           <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
             {p.change ? (
@@ -1318,7 +1351,9 @@ function IndicatorRow({
             ) : (
               <span className="text-[14px] text-gray-500">{p.note}</span>
             )}
+            <span className="sr-only">, </span>
           </span>
+          {/* 보이는 행동 이름(추이 보기·접기)은 버튼 이름에 남긴다 — 음성 제어로 "추이 보기"라고 말해 누를 수 있게 */}
           <span
             className={`inline-flex h-[34px] shrink-0 items-center gap-1 rounded-full px-3.5 text-[14px] font-bold ${
               open ? "bg-[#FFB81C] text-gray-900" : "bg-[#FFF4D6] text-[#8A6400]"
@@ -1340,8 +1375,8 @@ function IndicatorRow({
 
 function IntroCard() {
   return (
-    <section className="card p-4">
-      <h1 className="accent-bar flex items-center text-[20px] font-extrabold tracking-tight text-gray-900">
+    <section className="card p-4 sm:p-6">
+      <h1 className="accent-bar flex items-center text-[19px] font-extrabold tracking-tight text-gray-900">
         경제지표
       </h1>
       <p className="mt-1 text-[15px] text-gray-600">
@@ -1503,10 +1538,13 @@ export function IndicatorBoard() {
           <p className="sr-only">지표를 불러오는 중입니다</p>
           {[0, 1].map((g) => (
             <div key={g}>
-              <div className="mb-2 ml-1 mt-6 h-5 w-24 animate-pulse rounded bg-gray-200" />
+              {/* 불러온 뒤의 GroupHeading(29px)·줄(118px)과 같은 높이 — 목록이 뜰 때 밀리지 않게 */}
+              <div className="mb-2 mt-6 flex h-[29px] items-center px-1">
+                <div className="h-5 w-24 animate-pulse rounded bg-gray-200" />
+              </div>
               <div className="card divide-y divide-[var(--line)] overflow-hidden">
                 {[0, 1, 2, 3].map((r) => (
-                  <div key={r} className="h-[96px] p-3">
+                  <div key={r} className="h-[118px] p-3">
                     <div className="h-full animate-pulse rounded-xl bg-gray-100" />
                   </div>
                 ))}
@@ -1517,15 +1555,16 @@ export function IndicatorBoard() {
       )}
 
       {status === "error" && (
-        <div className="card mt-6 p-5 text-center">
-          <p className="text-[15px] text-gray-800">지표를 불러오지 못했습니다.</p>
-          <button
-            type="button"
-            onClick={load}
-            className="mt-3 h-11 rounded-xl border border-[var(--line)] bg-white px-4 text-[15px] font-bold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FFB81C]"
-          >
-            다시 불러오기
-          </button>
+        <div className="card mt-6 p-4 sm:p-6">
+          <div role="alert" className="error-box">
+            <p className="text-[15px] font-bold text-rose-800">지표를 불러오지 못했습니다</p>
+            <p className="mt-1 text-[14px] text-rose-800">
+              잠시 후 다시 시도해 주세요. 계속되면 담당자에게 알려 주세요.
+            </p>
+            <button type="button" onClick={load} className="btn-retry">
+              다시 불러오기
+            </button>
+          </div>
         </div>
       )}
 

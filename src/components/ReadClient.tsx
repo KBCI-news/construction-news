@@ -140,6 +140,12 @@ export default function ReadClient() {
     return Math.max(1, Math.round(chars / 500));
   }, [article, meta]);
 
+  // 목록을 내려 둔 채 기사를 누르면 로딩 화면이 짧아 Next가 맨 위로 올리지 않고,
+  // 본문이 붙으면 브라우저가 목록의 스크롤 위치를 되살려 기사 중간에서 열린다 — 새 기사는 맨 위에서 시작한다
+  useEffect(() => {
+    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: "instant" });
+  }, [url]);
+
   useEffect(() => {
     setLeadFailed(false);
     if (!url) {

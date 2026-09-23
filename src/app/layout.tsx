@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: { default: "KBCI 뉴스룸", template: "%s | KBCI 뉴스룸" },
   description: "KB신용정보 사내 뉴스 모니터링",
   robots: { index: false, follow: false },
+  // 언론사 이미지 서버 다수가 외부 Referer를 막는다(핫링크 차단) — 썸네일·리더 본문 이미지 모두.
+  // 사내 도구라 원문 링크로 나갈 때 출처를 넘길 이유도 없다.
+  referrer: "no-referrer",
 };
 
 export const viewport: Viewport = {

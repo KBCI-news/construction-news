@@ -22,6 +22,9 @@ export function Thumbnail({
         src={src}
         alt=""
         loading="lazy"
+        decoding="async"
+        // 언론사 이미지 서버 다수가 외부 사이트 Referer를 막는다(핫링크 차단) — 보내지 않으면 통과한다
+        referrerPolicy="no-referrer"
         onError={() => setFailed(true)}
         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
       />

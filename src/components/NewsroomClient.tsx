@@ -245,6 +245,10 @@ export default function NewsroomClient() {
   const remaining = items.length - shown.length;
   // API가 LIMIT건에서 자르므로 LIMIT건이면 "그 이상"일 수 있다
   const capped = items.length >= LIMIT;
+  // 전체(scope=tagged)와 관련도 검색은 API가 후보를 넉넉히 받은 뒤 한 번 더 거른다(route.ts fetchLimit) —
+  // LIMIT건보다 적게 와도 뒤에 더 있을 수 있어 '마지막 기사'라고 단정하지 않는다
+  const postFiltered =
+    (!tag.desk && !tag.legal && !q) || (sort === "relevance" && Boolean(q || tag.q));
   const narrowed = Boolean(tag.id) || range !== "all";
   const sortLabel =
     sort === "score" ? "중요도순" : sort === "relevance" ? "관련도순" : "최신순";
@@ -253,6 +257,8 @@ export default function NewsroomClient() {
   const heading = q ? `“${q}” 검색 결과` : tag.label;
   // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융)
   const scope = q && tag.q ? (TAGS.find((t) => t.desk === tag.desk && !t.q) ?? tag) : tag;
+  // 전체 태그의 검색은 scope=tagged 없이 조회해 태그 없는 기사도 나온다 — '태그 붙은 기사만' 안내를 그대로 두면 틀린 말이 된다
+  const hint = q && !tag.id ? "태그와 관계없이 검색합니다 · 태그 밖 기사도 함께 찾습니다" : tag.hint;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -342,9 +348,7 @@ export default function NewsroomClient() {
                 );
               })}
             </ul>
-            {tag.hint && (
-              <p className="mt-1.5 text-[13px] leading-snug text-gray-600">{tag.hint}</p>
-            )}
+            {hint && <p className="mt-1.5 text-[13px] leading-snug text-gray-600">{hint}</p>}
           </div>
         </div>
 
@@ -508,8 +512,15 @@ export default function NewsroomClient() {
                 </button>
               </div>
             ) : capped ? (
+              // 모바일 폭에서 한 줄에 다 안 들어가 끝말만 홀로 넘어간다 — 문장 단위로 두 줄
               <p className="mt-5 text-center text-[13px] text-gray-600">
-                최대 {LIMIT}건까지 보여 드립니다 · 기간이나 태그를 좁혀 보세요
+                최대 {LIMIT}건까지 보여 드립니다
+                <span className="block">기간이나 태그를 좁혀 보세요</span>
+              </p>
+            ) : postFiltered ? (
+              <p className="mt-5 text-center text-[13px] text-gray-600">
+                여기까지 보여 드립니다
+                <span className="block">더 찾으려면 기간이나 태그를 좁혀 보세요</span>
               </p>
             ) : (
               <p className="mt-5 text-center text-[13px] text-gray-600">마지막 기사입니다</p>

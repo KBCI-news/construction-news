@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { BidItem, BidsResponse } from "@/app/api/bids/route";
 import { BID_AREAS, bidAreaLabel } from "@/lib/bids";
@@ -183,8 +183,10 @@ export default function BidsClient() {
           <p className="mt-1 text-[13.5px] text-gray-700">
             관리자 설정이 끝나면 이 화면에 공고가 표시됩니다.
           </p>
-          <details className="mt-2 text-[12.5px] text-gray-600">
-            <summary className="cursor-pointer font-bold">관리자용 안내</summary>
+          {/* 요약 줄은 위아래 여백으로 44px 터치 영역 — 아래 여백은 음수 여백으로 상자 패딩과 겹쳐 높이를 늘리지 않는다.
+              list-item 표시를 유지해야 안드로이드 크롬이 ▶ 표시를 그린다 */}
+          <details className="text-[12.5px] text-gray-600">
+            <summary className="-mb-3 cursor-pointer py-3 font-bold">관리자용 안내</summary>
             <p className="mt-1">
               Supabase에 <code>supabase/migrations/0009_bids.sql</code>을 적용한 뒤,
               공공데이터포털 서비스키를 <code>G2B_SERVICE_KEY</code>로 등록하세요.
@@ -365,18 +367,19 @@ export default function BidsClient() {
           <>
             {data.lastRun && (
               <p
-                className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-gray-800"
+                className="mt-1 flex items-start gap-1.5 text-[13px] font-semibold text-gray-800"
                 title={data.lastRun.detail ?? undefined}
               >
+                {/* 360px에서 경고 문구가 두 줄이 되어도 점은 첫 줄 옆에 */}
                 <span
                   aria-hidden
-                  className={`h-2 w-2 shrink-0 rounded-full ${
+                  className={`mt-[6px] h-2 w-2 shrink-0 rounded-full ${
                     !data.lastRun.ok ? "bg-rose-600" : stale ? "bg-amber-500" : "bg-emerald-500"
                   }`}
                 />
                 마지막 확인 {formatRelative(data.lastRun.ranAt)}
                 {stale && " — 확인이 늦어지고 있습니다"}
-                {!data.lastRun.ok && " — 마지막 확인에 문제가 있었습니다"}
+                {!data.lastRun.ok && " — 확인 중 문제가 있었습니다"}
               </p>
             )}
             <p className="mb-3 mt-0.5 text-[13px] leading-relaxed text-gray-600">
@@ -400,7 +403,12 @@ export default function BidsClient() {
           </div>
         ) : !data ? (
           <Skeleton />
-        ) : !data.ready ? null : items.length === 0 ? (
+        ) : !data.ready ? (
+          // 준비 중 안내는 위 노란 상자가 맡는다 — 목록 칸이 제목만 남은 빈 상자로 보이지 않게 한 줄만
+          <p className="py-8 text-center text-[14px] text-gray-600">
+            설정이 끝나면 이곳에 공고가 표시됩니다
+          </p>
+        ) : items.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[15px] font-bold text-gray-900">조건에 맞는 공고가 없습니다</p>
             <p className="mt-1 text-[13.5px] text-gray-600">
@@ -571,20 +579,22 @@ function BidRow({ bid }: { bid: BidItem }) {
         )}
       </p>
 
-      {/* 항목은 inline-block — '소재지 기준: 본사 / 또는 참여지사'처럼 한 항목이 줄 사이로 갈라지지 않게 */}
+      {/* 항목은 한 덩어리로 줄을 바꾼다('소재지 기준: 본사 / 또는 참여지사'로 갈라지지 않게).
+          가운뎃점은 리더 메타 줄처럼 항목 앞에 붙이고 한 칸만큼 왼쪽으로 밀어 잘라 낸다 —
+          지역 항목이 다음 줄로 넘어가도 윗줄 끝에 점이 홀로 남지 않는다 */}
       {facts.length > 0 && (
-        <p className="mt-1 text-[13.5px] text-gray-700">
-          {facts.map((f, i) => (
-            <Fragment key={i}>
-              {i > 0 && (
-                <span aria-hidden className="mx-1.5 text-gray-300">
-                  ·
-                </span>
-              )}
-              <span className="inline-block">{f}</span>
-            </Fragment>
-          ))}
-        </p>
+        <div className="mt-1 overflow-hidden">
+          <p className="-ml-[18px] flex flex-wrap text-[13.5px] text-gray-700">
+            {facts.map((f, i) => (
+              <span
+                key={i}
+                className="before:inline-block before:w-[18px] before:text-center before:font-normal before:text-gray-300 before:content-['·']"
+              >
+                {f}
+              </span>
+            ))}
+          </p>
+        </div>
       )}
 
       <p className="mt-1 text-[12.5px] tabular-nums text-gray-600">
