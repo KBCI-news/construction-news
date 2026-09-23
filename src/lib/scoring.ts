@@ -40,16 +40,32 @@ function findTermGuarded(
   return stripped.includes(norm) ? hit : null;
 }
 
-// 문맥 필수어가 있는 term은 제목·요약에 그 문맥이 함께 있어야 인정한다.
-// 본문은 보지 않는다 — 관련기사·타 부서 단속 목록이 섞여 들어오기 때문이다.
+// 문맥 필수어가 있는 term은 그 문맥이 제목에 있거나, 요약에 서로 떨어진
+// 근거가 두 곳 이상 있어야 인정한다. 요약의 한 단어는 "부동산·대부업·식품·
+// 환경…" 같은 단속 분야 나열일 때가 많다. 본문은 보지 않는다 — 관련기사가 섞인다.
 function contextOk(
   hay: NormalizedHaystack,
   pt: { requiresNorms?: string[] },
 ): boolean {
-  if (!pt.requiresNorms?.length) return true;
-  return pt.requiresNorms.some(
-    (r) => hay.title.includes(r) || hay.description.includes(r),
-  );
+  const req = pt.requiresNorms;
+  if (!req?.length) return true;
+  if (req.some((r) => hay.title.includes(r))) return true;
+
+  // 겹치는 일치("미등록대부업" 안의 미등록대부·대부업)는 한 근거로 센다
+  const spans: [number, number][] = [];
+  for (const r of req) {
+    for (let i = hay.description.indexOf(r); i >= 0; i = hay.description.indexOf(r, i + 1)) {
+      spans.push([i, i + r.length]);
+    }
+  }
+  spans.sort((a, b) => a[0] - b[0]);
+  let groups = 0;
+  let end = -1;
+  for (const [s, e] of spans) {
+    if (s >= end) groups += 1;
+    end = Math.max(end, e);
+  }
+  return groups >= 2;
 }
 
 // 8축 가중치 (합 100). 점수는 서버 cron에서 미리 계산해 저장한다.
@@ -147,10 +163,14 @@ export function scoreArticle(input: ScoreInput): ScoreResult {
     if (pt.tier <= 1) nearCount += 1;
   }
 
-  // 포함관계인 term은 독립 근거가 아니다 ("전자문서법"이 걸리면 "전자문서"는 자동)
-  const allTerms = evidence.map((e) => e.term);
+  // 포함관계인 term은 독립 근거가 아니다 ("전자문서법"이 걸리면 "전자문서"는 자동).
+  // 같은 필드 안에서만 따진다 — 요약의 "채권추심법" 때문에 제목의 "채권추심"
+  // 근거가 사라지던 문제.
   const independent = evidence.filter(
-    (e) => !allTerms.some((o) => o !== e.term && o.includes(e.term)),
+    (e) =>
+      !evidence.some(
+        (o) => o.term !== e.term && o.field === e.field && o.term.includes(e.term),
+      ),
   );
 
   // 데스크는 제목 근거로만 붙는다.

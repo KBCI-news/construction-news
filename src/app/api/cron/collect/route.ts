@@ -12,8 +12,9 @@ export const maxDuration = 60;
 const NAVER_ENDPOINT = "https://openapi.naver.com/v1/search/news.json";
 const PER_KEYWORD = 100;
 
-// 한 회차에 호출할 검색어 상한. 티어별 폴링 주기로 자연히 분산된다.
-const MAX_QUERIES_PER_RUN = 40;
+// 한 회차에 호출할 검색어 상한 — 분산 후 한 슬롯 최대치(T0 전부 + T1의 1/4 +
+// 하위 티어 몇 개)를 넉넉히 덮는다. 이 값에 걸려 잘리면 응답의 dropped에 남는다.
+const MAX_QUERIES_PER_RUN = 48;
 
 // 이미지 백필: 매번 최신만 재시도하면 NULL 백로그가 단조 증가하므로
 // 오래된 것부터 순환하도록 pub_date 오름차순으로 가져온다.
@@ -45,18 +46,24 @@ function unauthorized() {
 
 /**
  * 이번 회차에 호출할 검색어를 티어별 주기에 따라 고른다.
- * 분 단위 시계를 슬롯으로 써서, 배포마다 상태를 저장하지 않고도
- * T0는 30분마다 / T1은 120분마다 도는 효과를 낸다.
+ * 분 단위 시계를 30분 슬롯으로 쓰고, 주기 안의 슬롯들에 티어의 검색어를
+ * 나눠 싣는다 — T1(120분)이면 68개를 네 슬롯에 17개씩. 예전에는 한 슬롯에
+ * 티어 전체를 몰아 넣고 상한에서 잘라, T1 54개(KB국민카드·신용정보사·
+ * 전세사기 등)가 한 번도 호출되지 않았다.
  */
 function dueTerms(nowMinutes: number) {
-  const due = QUERY_TERMS.filter((t) => {
-    const period = POLL_MINUTES[t.tier];
-    const slot = Math.floor(nowMinutes / 30) * 30; // cron이 30분 주기
-    return slot % period === 0;
-  });
-  // 항상 T0를 우선 채우고 남는 자리를 하위 티어로
-  const sorted = due.sort((a, b) => a.tier - b.tier);
-  return sorted.slice(0, MAX_QUERIES_PER_RUN);
+  const slotIndex = Math.floor(nowMinutes / 30);
+  const due: typeof QUERY_TERMS = [];
+  for (const tier of [0, 1, 2, 3] as const) {
+    const slots = Math.max(1, POLL_MINUTES[tier] / 30);
+    QUERY_TERMS.filter((t) => t.tier === tier).forEach((t, i) => {
+      if (i % slots === slotIndex % slots) due.push(t);
+    });
+  }
+  return {
+    tasks: due.slice(0, MAX_QUERIES_PER_RUN),
+    dropped: due.slice(MAX_QUERIES_PER_RUN).map((t) => t.term),
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -78,7 +85,7 @@ export async function GET(request: NextRequest) {
   }
 
   const nowMs = Date.now();
-  const tasks = dueTerms(Math.floor(nowMs / 60_000));
+  const { tasks, dropped } = dueTerms(Math.floor(nowMs / 60_000));
 
   let fetchedCount = 0;
   const failures: { keyword: string; status: number }[] = [];
@@ -179,6 +186,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     queriesRun: tasks.length,
+    ...(dropped.length ? { dropped } : {}),
     fetched: fetchedCount,
     unique: rows.length,
     upserted: upsertedCount,
