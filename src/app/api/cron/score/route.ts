@@ -28,6 +28,13 @@ const CLUSTER_MAX_ROWS = 6000;
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;
 
+// 사전을 고친 뒤 scored_at을 비우면 7일 창 밖(30일 보존분)은 영영 다시 채점되지
+// 않아 옛 태그가 목록에 남았다. 창 밖 기사는 태그·점수만 다시 매기고 중복 묶음
+// (cluster_id·is_rep)은 그대로 둔다 — 백필 경로처럼 is_rep=true로 되돌리면
+// 이미 접힌 중복 기사가 다시 펼쳐진다.
+const RETAG_WINDOW_DAYS = 30;
+const RETAG_MAX_ROWS = 3000;
+
 type Row = {
   link: string;
   title: string;
@@ -189,8 +196,48 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // ---- 2b) 창 밖 재채점 대기 기사: 태그·점수만 갱신 ---------------------------
+  let retagRows: (Row & { cluster_hosts: number | null })[] = [];
+  try {
+    retagRows = (await fetchPaged(
+      supabase,
+      () =>
+        supabase
+          .from("articles")
+          .select(`${SELECT},cluster_hosts`)
+          .lt("pub_date", since)
+          .gte("pub_date", new Date(now - RETAG_WINDOW_DAYS * 86_400_000).toISOString())
+          .is("scored_at", null)
+          .order("pub_date", { ascending: false }) as never,
+      RETAG_MAX_ROWS,
+    )) as (Row & { cluster_hosts: number | null })[];
+  } catch {
+    retagRows = [];
+  }
+  for (const r of retagRows) {
+    const res = scoreOf(r, r.cluster_hosts ?? 1);
+    payload.set(r.link, {
+      link: r.link,
+      title: r.title,
+      pub_date: r.pub_date,
+      importance: res.score,
+      importance_tier: res.tier,
+      importance_parts: res.parts,
+      reasons: res.reasons,
+      urgent: res.urgent,
+      desks: res.desks,
+      kinds: res.kinds,
+      matched_terms: res.matchedTerms.slice(0, 40),
+      scored_at: new Date(now).toISOString(),
+    });
+  }
+
   // ---- 3) 저장 ---------------------------------------------------------------
-  const rows = Array.from(payload.values());
+  // 창 밖 재채점 행은 열 구성이 달라(묶음 열 없음) 따로 upsert한다 —
+  // 한 번에 보내면 PostgREST가 빠진 열을 null로 채운다
+  const retagLinks = new Set(retagRows.map((r) => r.link));
+  const rows = Array.from(payload.values()).filter((r) => !retagLinks.has(r.link as string));
+  const retagPayload = Array.from(payload.values()).filter((r) => retagLinks.has(r.link as string));
   let saved = 0;
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
@@ -205,6 +252,20 @@ export async function GET(request: NextRequest) {
       );
     }
     saved += chunk.length;
+  }
+  let retagged = 0;
+  for (let i = 0; i < retagPayload.length; i += CHUNK) {
+    const chunk = retagPayload.slice(i, i + CHUNK);
+    const { error: rtErr } = await supabase
+      .from("articles")
+      .upsert(chunk, { onConflict: "link" });
+    if (rtErr) {
+      return NextResponse.json(
+        { error: "Retag upsert failed", detail: rtErr.message, saved, retagged },
+        { status: 500 },
+      );
+    }
+    retagged += chunk.length;
   }
 
   // ---- 4) 경제지표 추출 -------------------------------------------------------
@@ -288,6 +349,7 @@ export async function GET(request: NextRequest) {
     clusterCandidates: clusterRows.length,
     backfilled: unscored.length,
     saved,
+    retagged,
     absorbed,
     indicatorScanned: indicatorRows.length,
     indicatorsUpdated,
