@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>뉴스룸 태그별 키워드 지도</title>
+<meta name="description" content="KBCI 뉴스룸 태그(채권추심·KB금융·임대차/권리조사·전자문서·신용정보업권·법/정책)별 키워드 사전을 최근 30일 매칭 기사 수로 그린 트리맵">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #eef0f4;
+    --card: #ffffff;
+    --ink: #111827;
+    --ink-2: #4b5563;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --kb: #FFB81C;
+    --kb-ink: #7A5E08;
+    --kb-tint: #FFF4D6;
+    --font: "IBM Plex Sans KR", "KBFG", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; }
+  .page { max-width: 1600px; margin: 0 auto; padding: 16px; }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 2px 2px 10px; }
+  h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .brand { font-size: 13px; font-weight: 600; color: var(--kb-ink); background: var(--kb-tint); border-radius: 999px; padding: 3px 10px; line-height: 1.3; }
+  .sub { width: 100%; margin: 0; font-size: 14px; color: var(--ink-2); }
+  .card { background: var(--card); border-radius: 12px; padding: 12px; box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; margin-bottom: 10px; padding: 10px 12px; }
+  .lg-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--ink); }
+  .lg-key { font-weight: 600; color: var(--ink-2); }
+  .sw { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid transparent; flex: none; }
+  .sw.zero { background: #fff; border-color: #c9ced6; }
+  .sw.subtag { background: #E5D9B9; border: 2px solid #5C4300; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-2); flex: none; margin: 0 2px; }
+  .lg-sep { width: 1px; height: 16px; background: var(--line); flex: none; }
+  .map { margin-bottom: 10px; }
+  .map svg { display: block; width: 100%; height: auto; }
+  .map .fallback { padding: 24px; color: var(--ink-2); font-size: 15px; }
+  .stack + .stack { margin-top: 10px; }
+  .note { font-size: 13px; color: var(--ink-2); margin: 8px 2px 14px; }
+  .note b { color: var(--ink); font-weight: 600; }
+  .tbl summary { font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 12px; min-height: 44px; display: flex; align-items: center; gap: 8px; }
+  .tbl summary::-webkit-details-marker { display: none; }
+  .tbl summary::before { content: "▸"; font-size: 13px; color: var(--muted); }
+  .tbl[open] summary::before { content: "▾"; }
+  .tbl-body { padding: 0 12px 12px; }
+  .tbl h3 { font-size: 15px; margin: 18px 0 6px; display: flex; align-items: center; gap: 8px; }
+  .tbl h3 .sw { width: 12px; height: 12px; }
+  .tbl h3 small { font-size: 13px; font-weight: 500; color: var(--ink-2); }
+  .tbl h4 { font-size: 14px; margin: 12px 0 4px; color: var(--ink-2); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.zero { color: var(--muted); }
+  td .q { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-2); margin-right: 5px; vertical-align: 1px; }
+  .tip { position: fixed; z-index: 10; max-width: 300px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 6px 20px rgba(17, 24, 39, 0.16); font-size: 14px; pointer-events: none; }
+  .tip[hidden] { display: none; }
+  .tip-tag { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 9px; margin-bottom: 6px; }
+  .tip-term { font-size: 16px; font-weight: 700; line-height: 1.3; }
+  .tip-n { margin-top: 3px; color: var(--ink-2); }
+  .tip-n b { color: var(--ink); font-size: 16px; font-weight: 700; }
+  .tip-meta { margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+  .leaf:focus { outline: none; }
+  .leaf:focus-visible rect { stroke: var(--ink) !important; stroke-width: 2px; }
+  .foot { font-size: 12px; color: var(--muted); margin: 6px 2px 0; }
+  @page { size: A4 landscape; margin: 8mm; }
+  @media print {
+    body { background: #fff; }
+    .page { max-width: none; padding: 0; }
+    .card { box-shadow: none; border: 1px solid var(--line); break-inside: avoid; }
+    .map { page-break-after: always; break-after: page; margin-bottom: 0; }
+    .map .card { padding: 6px; }
+    .note { margin: 6px 0 0; }
+    .tip { display: none !important; }
+    .tbl summary::before { display: none; }
+    .tbl summary { padding: 6px 0; min-height: 0; }
+    .tbl { break-inside: auto; }
+    .tbl-body { columns: 2; column-gap: 20px; padding: 0 0 6px; }
+    .tbl h3 { break-after: avoid; break-inside: avoid; margin: 10px 0 4px; font-size: 13px; }
+    .tbl h4 { break-after: avoid; margin: 8px 0 2px; font-size: 12px; }
+    table { font-size: 12px; break-inside: auto; }
+    th, td { padding: 2px 5px; }
+    tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="head">
+    <h1>뉴스룸 태그별 키워드 지도</h1>
+    <span class="brand">KBCI 뉴스룸</span>
+    <p class="sub" id="subtitle"></p>
+  </header>
+
+  <section class="legend card" aria-label="범례">
+    <span class="lg-key">색 = 태그</span>
+    <span id="legend-tags" style="display:contents"></span>
+    <span class="lg-sep" aria-hidden="true"></span>
+    <span class="lg-item"><span class="lg-key">면적</span> = 최근 30일 매칭 기사 수</span>
+    <span class="lg-sep" aria-hidden="true"></span>
+    <span class="lg-item"><span class="dot" aria-hidden="true"></span>= 네이버 수집 쿼리</span>
+    <span class="lg-sep" aria-hidden="true"></span>
+    <span class="lg-item"><span class="lg-key">진하기 = 등급</span>
+      <span class="sw" style="background:#FFB81C;border-color:#e3a20f" aria-hidden="true"></span>T0 핵심
+      <span class="sw" style="background:#FFD873;border-color:#f0c65a" aria-hidden="true"></span>T1
+      <span class="sw" style="background:#FFEBB8;border-color:#f1dc9f" aria-hidden="true"></span>T2 이하
+    </span>
+    <span class="lg-sep" aria-hidden="true"></span>
+    <span class="lg-item"><span class="sw zero" aria-hidden="true"></span>흰 칸 = 매칭 0건 (최소 크기로 표시)</span>
+    <span class="lg-sep" aria-hidden="true"></span>
+    <span class="lg-item"><span class="sw subtag" aria-hidden="true"></span>굵은 테두리 = 소태그 (KB국민카드 · KB신용정보)</span>
+  </section>
+
+  <section id="map" class="map" aria-label="태그별 키워드 트리맵"></section>
+
+  <p class="note" id="note"></p>
+
+  <details id="tbl" class="tbl card">
+    <summary id="tbl-summary">전체 키워드 표 보기</summary>
+    <div class="tbl-body" id="tbl-body"></div>
+  </details>
+  <p class="foot" id="foot"></p>
+
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+</main>
+
+<script>window.__DATA__ = {"meta":{"from":"2026-09-08","to":"2026-10-07","queriedAt":"2026-10-08T01:59Z","total":30962,"matched":17726,"taggedDesks":1891,"legalTagged":313},"tree":{"level":"root","children":[{"level":"group","id":"collection","label":"채권추심","hue":"yellow","total":323,"totalLabel":"태그 기사","children":[{"level":"leaf","term":"채권추심","n":133,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권추심법","n":10,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"추심업","n":29,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"추심","n":376,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"불법추심","n":64,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권추심회사","n":1,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권추심업","n":20,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"위임직채권추심인","n":0,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권추심 가이드라인","n":0,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"매입채권추심","n":11,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"추심위탁","n":1,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"특별사법경찰","n":4,"tier":1,"query":false,"authOnly":false,"requires":true,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"특사경","n":4,"tier":1,"query":false,"authOnly":false,"requires":true,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"개인채무자보호법","n":16,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"대부업법","n":38,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"포용금융","n":459,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채무 감면","n":15,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"감면","n":169,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권양도","n":24,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"소멸시효","n":430,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"지급명령","n":41,"tier":1,"query":true,"authOnly":false,"requires":true,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권압류","n":66,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"강제집행","n":386,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"대부업","n":240,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"불법사금융","n":548,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채무자대리인","n":12,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"추심 유예","n":1,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"민사집행법","n":29,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"시효중단","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"시효연장","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"가압류","n":98,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"대위변제","n":18,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"구상권","n":10,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권양도통지","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"추심수수료","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"무담보채권","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"담보부채권","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채무불이행자","n":2,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"추심연락","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"상거래채권","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"채권관리","n":40,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"대부채권 매각","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"},{"level":"leaf","term":"금감원 채권추심","n":2,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"collection","deskLabel":"채권추심"}]},{"level":"group","id":"own","label":"KB금융","hue":"brown","total":362,"totalLabel":"태그 기사","children":[{"level":"leaf","term":"KB신용정보","n":0,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사","subtag":true},{"level":"leaf","term":"KB금융","n":784,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB국민은행","n":1001,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB국민카드","n":426,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사","subtag":true},{"level":"leaf","term":"KB금융지주","n":62,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB캐피탈","n":11,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB저축은행","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB손해보험","n":10,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB증권","n":69,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB라이프","n":8,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"},{"level":"leaf","term":"KB데이타시스템","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"own","deskLabel":"KB·자사"}],"note":"KB신용정보(소태그) 매칭 0건"},{"level":"group","id":"survey","label":"임대차/권리조사","hue":"aqua","total":134,"totalLabel":"태그 기사","children":[{"level":"leaf","term":"임대차조사","n":2,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"권리조사","n":8,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"전세사기","n":335,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"깡통전세","n":33,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"역전세","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"전세보증금","n":322,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"보증금 반환","n":73,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"전세보증금 반환보증","n":22,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"주택도시보증공사","n":287,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"보증사고","n":16,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"임대차보호법","n":101,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"임대차 실태조사","n":1,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"주택임대차","n":83,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"상가임대차","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"확정일자","n":8,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"전입세대열람","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"임차권등기","n":11,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"대항력","n":9,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"우선변제권","n":7,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"선순위 임차인","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"등기부등본","n":2,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"등기사항증명서","n":2,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"근저당권","n":25,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"권리분석","n":19,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"부동산 경매","n":8,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"공매","n":61,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"},{"level":"leaf","term":"배당요구","n":3,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"survey","deskLabel":"임대차·권리조사"}]},{"level":"group","id":"edoc","label":"전자문서","hue":"blue","total":23,"totalLabel":"태그 기사","children":[{"level":"leaf","term":"공인전자문서","n":12,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"공인전자문서센터","n":3,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자문서법","n":5,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자문서","n":250,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자금융거래법","n":144,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자금융감독규정","n":24,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자서명","n":198,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자고지","n":65,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"공인전자문서중계자","n":7,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자화문서","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"유통증명서","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"공인전자주소","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"모바일 전자고지","n":18,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자서명인증사업자","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"온라인 송달","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자소송","n":9,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자계약","n":36,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"타임스탬프","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"문서 전자화","n":0,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"종이문서","n":51,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자결재","n":153,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"문서보관","n":48,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"기록물관리","n":121,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"스캔본","n":2,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"신뢰스캔","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자화 대상문서","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"문서 보존","n":3,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"보존연한","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"원본대조","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"문서 파기","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자문서 유통","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"},{"level":"leaf","term":"전자문서산업","n":0,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"edoc","deskLabel":"전자문서"}]},{"level":"group","id":"peers","label":"신용정보업권","hue":"violet","total":15,"totalLabel":"태그 기사","children":[{"level":"leaf","term":"고려신용정보","n":5,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"나이스신용정보","n":4,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"미래신용정보","n":1,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"SGI신용정보","n":0,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"신한신용정보","n":0,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"우리신용정보","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"하나신용정보","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"IBK신용정보","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"MG신용정보","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"새한신용정보","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"솔림신용정보","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"중앙신용정보","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"우리금융에프앤아이","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"하나에프앤아이","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"대신에프앤아이","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"키움에프앤아이","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"유암코","n":3,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"연합자산관리","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"NICE평가정보","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"코리아크레딧뷰로","n":7,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"KCB","n":17,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"},{"level":"leaf","term":"한국기업데이터","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"peers","deskLabel":"경쟁사"}]},{"level":"group","id":"legal","label":"법/정책","hue":"red","total":313,"totalLabel":"태그 기사","note":"데스크가 아니라 사건종류로 붙는 태그","children":[{"level":"sub","id":"labor","label":"노동 법제 키워드 (노동 데스크)","total":95,"totalLabel":"기사","children":[{"level":"leaf","term":"근로기준법","n":320,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"노란봉투법","n":358,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"근로자추정제","n":47,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"노동자추정제","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"중대재해처벌법","n":402,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"산업안전보건법","n":104,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"고용노동부","n":109,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"통상임금","n":17,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"직장 내 괴롭힘","n":43,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"감정노동","n":2,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"고객응대근로자","n":0,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"콜센터 상담원","n":0,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"파견근로","n":1,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"최저임금","n":21,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"정년연장","n":8,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"계속고용","n":1,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"},{"level":"leaf","term":"근로시간 개편","n":0,"tier":2,"query":false,"authOnly":false,"requires":false,"desk":"labor","deskLabel":"노동"}]},{"level":"sub","id":"act","label":"사건종류 판정어","total":313,"totalLabel":"법/정책 기사 안 등장","children":[{"level":"leaf","term":"과징금","n":73,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"과태료","n":21,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"제재","n":21,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"행정처분","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"시정명령","n":6,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"기관경고","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"경영유의","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"영업정지","n":2,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"등록취소","n":3,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"인가취소","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"검사 착수","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"종합검사","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"현장점검","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"압수수색","n":3,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"기소","n":8,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"구속","n":8,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"적발","n":9,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"제재심의위원회","n":0,"act":true,"grade":"제재·집행","kind":"regulation","kindLabel":"감독·제재","query":false},{"level":"leaf","term":"공포","n":3,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"의결","n":18,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"확정","n":30,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"통과","n":10,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"가결","n":7,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"제정","n":19,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"부칙","n":0,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"고시 개정","n":0,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"감독규정 개정","n":2,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"국무회의","n":6,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"관보 게재","n":0,"act":true,"grade":"확정·시행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"대법원","n":16,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"판결","n":27,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"선고","n":12,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"위헌","n":1,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"각하","n":13,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"확정판결","n":3,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"판례","n":2,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"손해배상 인정","n":0,"act":true,"grade":"사법","kind":"judgment","kindLabel":"판결","query":false},{"level":"leaf","term":"개정안","n":18,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"입법예고","n":1,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"발의","n":5,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"상정","n":6,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"추진","n":49,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"공청회","n":0,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"초안","n":0,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"유권해석","n":0,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"행정지도","n":0,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"가이드라인","n":5,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"업무계획","n":0,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false},{"level":"leaf","term":"로드맵","n":3,"act":true,"grade":"입법진행","kind":"legislation","kindLabel":"입법·개정","query":false}]}]},{"level":"group","id":"outside","label":"태그 밖 (수집·판정용)","hue":"gray","muted":true,"total":null,"totalLabel":"","note":"뉴스룸 태그에는 안 보이지만 수집 범위와 판정 근거로 쓰는 데스크 — 같은 축척","children":[{"level":"sub","id":"creditinfo","label":"정보보호","total":360,"totalLabel":"기사","children":[{"level":"leaf","term":"신용정보법","n":67,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용정보업","n":10,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"개인정보 유출","n":1560,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용정보","n":799,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"마이데이터","n":273,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"개인정보보호법","n":447,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"개인정보보호위원회","n":590,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"가명정보","n":170,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용평가","n":800,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"대안신용평가","n":122,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용정보업감독규정","n":3,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용정보관리보호인","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"본인신용정보관리업","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"한국신용정보원","n":71,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용정보원","n":101,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"전송요구권","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"데이터전문기관","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"데이터 결합","n":10,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"개인신용평점","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"정보활용동의","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"익명정보","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"정보주체","n":32,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"개인정보 과징금","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"신용정보 유출","n":24,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"금융위 신용정보","n":1,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"},{"level":"leaf","term":"개인정보보호위원회 과징금","n":4,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"creditinfo","deskLabel":"정보보호"}]},{"level":"sub","id":"lending","label":"대출","total":293,"totalLabel":"기사","children":[{"level":"leaf","term":"가계대출","n":530,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"가계부채","n":345,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"대출규제","n":550,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"주택담보대출","n":570,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"신용대출","n":317,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"개인사업자대출","n":92,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"자영업자 대출","n":54,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"대출금리","n":465,"tier":2,"query":true,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"DSR","n":60,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"스트레스DSR","n":9,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"LTV","n":34,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"DTI","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"여신심사","n":13,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"총량규제","n":37,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"정책대출","n":19,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"디딤돌대출","n":4,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"버팀목대출","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"보금자리론","n":25,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"중도상환수수료","n":8,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"대환대출","n":40,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"햇살론","n":25,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"서민금융","n":130,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"},{"level":"leaf","term":"소상공인 대출","n":10,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"lending","deskLabel":"대출"}]},{"level":"sub","id":"debtor","label":"채무자보호","total":215,"totalLabel":"기사","children":[{"level":"leaf","term":"채무조정","n":578,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"개인회생","n":231,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"개인파산","n":56,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"신용회복위원회","n":232,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"신속채무조정","n":9,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"새출발기금","n":103,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"프리워크아웃","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"개인워크아웃","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"면책","n":72,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"회생절차","n":168,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"서울회생법원","n":23,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"채무자회생법","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"채무조정 요청권","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"상환유예","n":13,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"연체이자 감면","n":15,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"신용사면","n":2,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"이자제한법","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"법정최고금리","n":13,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"다중채무자","n":14,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"},{"level":"leaf","term":"취약차주","n":110,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"debtor","deskLabel":"채무자보호"}]},{"level":"sub","id":"npl","label":"부실채권","total":135,"totalLabel":"기사","children":[{"level":"leaf","term":"부실채권","n":489,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"NPL 매각","n":10,"tier":0,"query":true,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"연체율","n":417,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"고정이하여신","n":181,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"부실채권 매각","n":29,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"상각채권","n":3,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"대손충당금","n":45,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"대손상각","n":11,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"NPL 시장","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"연체채권","n":81,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"가계대출 연체율","n":10,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"저축은행 연체율","n":0,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"카드 연체율","n":6,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"유동화전문회사","n":1,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"자산유동화","n":12,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"배드뱅크","n":5,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"},{"level":"leaf","term":"NPL 비율","n":66,"tier":1,"query":false,"authOnly":false,"requires":false,"desk":"npl","deskLabel":"부실채권"}]},{"level":"sub","id":"macro","label":"거시","total":29,"totalLabel":"기사","children":[{"level":"leaf","term":"기준금리","n":789,"tier":1,"query":true,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"금융통화위원회","n":15,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"금통위","n":12,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"소비자물가","n":29,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"코픽스","n":17,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"예금금리","n":93,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"부동산 PF","n":26,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"한계기업","n":34,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"가계신용","n":7,"tier":3,"query":false,"authOnly":false,"requires":false,"desk":"macro","deskLabel":"거시"}]},{"level":"sub","id":"auth","label":"감독기관명 (발신 주체 신호 · 태그 판정 제외)","total":null,"totalLabel":"","children":[{"level":"leaf","term":"금융위원회","n":665,"tier":2,"query":true,"authOnly":true,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"금융감독원","n":831,"tier":2,"query":true,"authOnly":true,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"공정거래위원회","n":459,"tier":2,"query":true,"authOnly":true,"requires":false,"desk":"macro","deskLabel":"거시"},{"level":"leaf","term":"금융보안원","n":340,"tier":2,"query":true,"authOnly":true,"requires":false,"desk":"edoc","deskLabel":"전자문서"}]}]}]},"hueByGroup":{"collection":"yellow","own":"brown","survey":"aqua","edoc":"blue","peers":"violet","legal":"red","outside":"gray"}};</script>
+<script>
+(function () {
+  "use strict";
+  const DATA = window.__DATA__;
+  const FONT = '"IBM Plex Sans KR","KBFG","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif';
+  const INK = "#111827", INK2 = "#4b5563", MUTED = "#6b7280";
+
+  // 색 — 태그별 한 색상의 밝기 단계. 칸 위 글자는 항상 잉크색(색 위 글자 대비 ≥ 7:1).
+  const HUES = {
+    yellow: { name: "KB 옐로", ink: "#7A5E08", t0: "#FFB81C", t1: "#FFD873", t2: "#FFEBB8", bg: "#FFF6DC", edge: "#F3D98A" },
+    blue:   { name: "블루",   ink: "#1C5CAB", t0: "#9CC4F2", t1: "#C5DCF8", t2: "#E3EEFC", bg: "#F0F6FE", edge: "#BBD4F2" },
+    aqua:   { name: "그린",   ink: "#0B6B4A", t0: "#95DFC2", t1: "#C2ECDB", t2: "#E2F6ED", bg: "#F0FAF5", edge: "#B6E4CF" },
+    violet: { name: "바이올렛", ink: "#3F2F96", t0: "#C2BAEC", t1: "#DAD5F4", t2: "#ECEAF9", bg: "#F4F2FB", edge: "#CFC9EE" },
+    brown:  { name: "KB 브라운", ink: "#5C4300", t0: "#D4C08F", t1: "#E5D9B9", t2: "#F1EBDB", bg: "#F7F4EC", edge: "#DDD0AC" },
+    red:    { name: "레드",   ink: "#A32D2D", t0: "#F5B3B2", t1: "#F9D0CF", t2: "#FCE6E6", bg: "#FDF1F1", edge: "#F2C6C5" },
+    gray:   { name: "그레이", ink: "#4B5563", t0: "#D1D5DB", t1: "#E2E5EA", t2: "#EEF0F3", bg: "#F6F7F9", edge: "#D5D9E0" },
+  };
+
+  const fmt = (n) => (n == null ? "" : Number(n).toLocaleString("ko-KR"));
+  const PRINT_PARAM = /[?&]print=1/.test(location.search);
+  const isPrint = () => PRINT_PARAM || (window.matchMedia && window.matchMedia("print").matches);
+
+  // ---- 글자 폭 측정 (칸에 들어갈 때만 라벨을 그린다) ----
+  const ctx = document.createElement("canvas").getContext("2d");
+  function tw(text, size, weight) {
+    ctx.font = `${weight} ${size}px ${FONT}`;
+    return ctx.measureText(text).width;
+  }
+
+  // ---- 머리글·주석 ----
+  const M = DATA.meta;
+  const dateKo = (s) => s.replace(/-/g, ".");
+  document.getElementById("subtitle").textContent =
+    `최근 30일 (${dateKo(M.from)} ~ ${dateKo(M.to)}) · 수집 기사 ${fmt(M.total)}건 · 키워드 매칭 기사 ${fmt(M.matched)}건 · 태그 부여 기사 ${fmt(M.taggedDesks)}건`;
+
+  const groups = DATA.tree.children;
+  const legendTags = document.getElementById("legend-tags");
+  for (const g of groups) {
+    const h = HUES[g.hue];
+    const el = document.createElement("span");
+    el.className = "lg-item";
+    el.innerHTML = `<span class="sw" style="background:${h.t0};border-color:${h.ink}" aria-hidden="true"></span>${g.label}`;
+    legendTags.appendChild(el);
+  }
+
+  document.getElementById("note").innerHTML =
+    `<b>읽는 법</b> 태그 머리글의 기사 수는 데스크 판정을 통과해 태그가 붙은 기사 수, 칸의 매칭 수는 제목·요약에 그 키워드가 등장한 대표기사 수(태그 판정 전)입니다. ` +
+    `법/정책은 데스크가 아니라 사건종류(감독·제재 / 입법·개정 / 판결)로 붙는 태그라 노동 법제 키워드와 <b>사건종류 판정어</b>를 함께 두었고, 판정어의 수는 법/정책 기사 ${fmt(M.legalTagged)}건 안에서 센 값입니다. ` +
+    `감독기관명(금융위원회·금융감독원 등)은 발신 주체 신호로만 쓰여 태그 판정에서 빠집니다. ` +
+    `매칭이 극히 적은 태그(신용정보업권)는 머리글이 보이도록 배치 면적에만 최소치(전체의 1.2%)를 두었고, 숫자는 실제 값입니다. 칸에 글자가 없으면 눌러서(또는 마우스를 올려) 확인하세요.`;
+  document.getElementById("foot").textContent =
+    `자료: KBCI 뉴스룸 DB (articles, 대표기사·is_rep 기준, ${M.queriedAt.replace("T", " ")} 조회) · 키워드 사전: src/lib/lexicon.ts`;
+
+  // ---- 계층 ----
+  // floorFrac: 매칭이 극히 적은 태그 묶음이 머리글도 못 보일 만큼 작아지지 않도록 묶음 면적에 최소치를 둔다
+  // (배치에만 쓰고, 표시되는 숫자는 실제 값 그대로. 주석에 밝힌다)
+  function hierarchy(data, floorFrac) {
+    const root = d3.hierarchy(data, (d) => d.children)
+      .sum((d) => (d.children ? 0 : Math.max(d.n, 1)));
+    if (floorFrac && root.children) {
+      const floorV = root.value * floorFrac;
+      for (const c of root.children) {
+        if (!c.data.muted && c.value < floorV) {
+          const k = floorV / c.value;
+          c.each((n) => { n.value *= k; });
+          c.data.floored = true;
+        }
+      }
+      root.value = d3.sum(root.children, (c) => c.value);
+    }
+    return root.sort((a, b) => b.value - a.value);
+  }
+  const hueOf = (node) => {
+    let n = node;
+    while (n && !(n.data && n.data.hue)) n = n.parent;
+    return HUES[(n && n.data.hue) || "gray"];
+  };
+  const groupOf = (node) => {
+    let n = node;
+    while (n && n.data.level !== "group") n = n.parent;
+    return n;
+  };
+
+  // 루트: 태그 묶음은 위쪽에 스쿼리파이, 태그 밖(muted)은 같은 축척으로 아래 띠에.
+  function rootTile(node, x0, y0, x1, y1) {
+    const main = node.children.filter((c) => !c.data.muted);
+    const side = node.children.filter((c) => c.data.muted);
+    const sideV = d3.sum(side, (c) => c.value);
+    const sideH = (y1 - y0) * (sideV / node.value);
+    d3.treemapSquarify({ children: main, value: node.value - sideV }, x0, y0, x1, y1 - sideH);
+    let xx = x0;
+    for (const c of side) {
+      const w = (x1 - x0) * (c.value / sideV);
+      c.x0 = xx; c.x1 = xx + w; c.y0 = y1 - sideH; c.y1 = y1;
+      xx += w;
+    }
+  }
+  const PAD_TOP = { group: 28, sub: 22 };
+  function layout(root, W, H) {
+    d3.treemap()
+      .size([W, H])
+      .tile((n, x0, y0, x1, y1) => (n.data.level === "root" ? rootTile(n, x0, y0, x1, y1) : d3.treemapSquarify(n, x0, y0, x1, y1)))
+      .paddingInner((d) => (d.data.level === "root" ? 6 : 2))
+      .paddingOuter((d) => (d.data.level === "root" ? 0 : 3))
+      .paddingTop((d) => (d.data.level === "root" ? 0 : PAD_TOP[d.data.level]))
+      (root);
+    return root;
+  }
+
+  // ---- 그리기 ----
+  function leafFill(d, h) {
+    if (d.data.n === 0) return "#ffffff";
+    if (d.data.act || d.data.authOnly) return h.t1;
+    return d.data.tier === 0 ? h.t0 : d.data.tier === 1 ? h.t1 : h.t2;
+  }
+  function tierLabel(d) {
+    if (d.data.act) return `사건종류 판정어 · ${d.data.kindLabel} (${d.data.grade})`;
+    if (d.data.authOnly) return `T${d.data.tier} · 발신 주체 신호 (태그 판정 제외)`;
+    return d.data.tier === 0 ? "T0 핵심" : `T${d.data.tier}`;
+  }
+  function ariaLabel(d) {
+    const g = groupOf(d);
+    return `${g.data.label}: ${d.data.term}, 최근 30일 매칭 ${fmt(d.data.n)}건, ${tierLabel(d)}${d.data.query ? ", 네이버 수집 쿼리" : ""}`;
+  }
+
+  function draw(container, root, W, H) {
+    const svg = d3.create("svg")
+      .attr("viewBox", `0 0 ${W} ${H}`)
+      .attr("width", W).attr("height", H)
+      .attr("font-family", FONT)
+      .attr("role", "group");
+    const nodes = root.descendants().filter((d) => d.data.level !== "root");
+    const w = (d) => Math.max(0, d.x1 - d.x0);
+    const hgt = (d) => Math.max(0, d.y1 - d.y0);
+    const overlay = svg.append("g").attr("class", "overlay"); // 칸 위에 얹는 세로 머리글 — 마지막에 맨 위로 올린다
+
+    // 묶음(태그 / 하위 묶음) 바탕
+    const conts = nodes.filter((d) => d.children);
+    const cg = svg.append("g").selectAll("g").data(conts).join("g");
+    cg.append("rect")
+      .attr("x", (d) => d.x0).attr("y", (d) => d.y0)
+      .attr("width", w).attr("height", hgt)
+      .attr("rx", (d) => (d.data.level === "group" ? 6 : 4))
+      .attr("fill", (d) => (d.data.level === "group" ? hueOf(d).bg : "rgba(255,255,255,0.6)"))
+      .attr("stroke", (d) => (d.data.level === "group" ? hueOf(d).edge : "none"))
+      .attr("stroke-width", 1);
+
+    // 묶음 머리글 — 들어갈 때만, 이름 → 이름+건수 순으로
+    cg.each(function (d) {
+      const h = hueOf(d);
+      const isG = d.data.level === "group";
+      const size = isG ? 14 : 12;
+      const avail = w(d) - 14;
+      if (hgt(d) < PAD_TOP[d.data.level] - 2 || w(d) < 18) return;
+      const name = d.data.label;
+      const cnt = d.data.total != null ? `${d.data.totalLabel} ${fmt(d.data.total)}건` : (d.data.totalLabel || "");
+      const nameW = tw(name, size, 700);
+      const t = d3.select(this).append("text")
+        .attr("x", d.x0 + 8).attr("y", d.y0 + (isG ? 19 : 16))
+        .attr("fill", h.ink).attr("font-size", size).attr("font-weight", 700);
+      if (avail >= 20 && nameW <= avail) {
+        t.append("tspan").text(name);
+        // 이름 → 건수 → 짧은 설명 순으로, 들어가는 데까지만
+        let used = nameW;
+        for (const [txt, wgt] of [[cnt, 500], [d.data.note, 500]]) {
+          if (!txt) continue;
+          const tw_ = tw(txt, 12, wgt);
+          if (used + 10 + tw_ > avail) break;
+          t.append("tspan").attr("dx", 10).attr("font-size", 12).attr("font-weight", wgt).text(txt);
+          used += 10 + tw_;
+        }
+      } else {
+        // 짧은 이름으로 (괄호 앞까지) → 그래도 안 들어가는 좁고 긴 묶음은 세로로
+        const short = name.replace(/\s*\(.*$/, "");
+        if (tw(short, size, 700) <= avail) { t.append("tspan").text(short); return; }
+        t.remove();
+        const vs = 12, chars = [...short.replace(/\s+/g, "")], adv = vs + 2, bw = vs + 6;
+        if (w(d) >= bw + 2 && hgt(d) >= chars.length * adv + 14) {
+          const gsel = overlay;
+          const bx = d.x0 + (w(d) - bw) / 2;
+          gsel.append("rect").attr("x", bx).attr("y", d.y0 + 3).attr("rx", 3)
+            .attr("width", bw).attr("height", chars.length * adv + 8).attr("fill", h.bg).attr("opacity", 0.94);
+          const vt = gsel.append("text").attr("text-anchor", "middle").attr("fill", h.ink).attr("font-size", vs).attr("font-weight", 700);
+          chars.forEach((c, i) => vt.append("tspan").attr("x", bx + bw / 2).attr("y", d.y0 + 5 + adv * (i + 1) - 2).text(c));
+        }
+      }
+    });
+
+    // 칸(키워드)
+    const leaves = nodes.filter((d) => !d.children);
+    const lg = svg.append("g").selectAll("g").data(leaves).join("g")
+      .attr("class", "leaf")
+      .attr("tabindex", 0)
+      .attr("role", "img")
+      .attr("aria-label", ariaLabel);
+    lg.append("rect")
+      .attr("x", (d) => d.x0).attr("y", (d) => d.y0)
+      .attr("width", w).attr("height", hgt)
+      .attr("rx", 3)
+      .attr("fill", (d) => leafFill(d, hueOf(d)))
+      .attr("stroke", (d) => {
+        const tiny = w(d) < 10 || hgt(d) < 10; // 아주 작은 칸은 테두리를 빼 사다리 무늬를 막는다
+        if (d.data.subtag) return hueOf(d).ink;
+        return d.data.n === 0 && !tiny ? hueOf(d).edge : "none";
+      })
+      .attr("stroke-width", (d) => (d.data.subtag ? (w(d) < 12 || hgt(d) < 12 ? 1 : 2.5) : 1));
+
+    // 이름을 칸 너비에 맞춰 줄로 나눈다. 1줄 → 균형 잡힌 2줄 → 3줄(탐욕) 순. 못 맞추면 null.
+    function wrapName(name, avail, size, weight, maxLines) {
+      if (tw(name, size, weight) <= avail) return [name];
+      if (maxLines < 2) return null;
+      const ch = [...name];
+      let best = null;
+      for (let i = 1; i < ch.length; i++) {
+        const a = ch.slice(0, i).join("").trim(), b = ch.slice(i).join("").trim();
+        if ([...a].length < 2 || [...b].length < 2) continue; // 한 글자짜리 줄은 만들지 않는다
+        const wa = tw(a, size, weight), wb = tw(b, size, weight);
+        if (wa > avail || wb > avail) continue;
+        const score = Math.max(wa, wb) - (ch[i] === " " || ch[i - 1] === " " ? 20 : 0);
+        if (!best || score < best.score) best = { score, lines: [a, b] };
+      }
+      if (best) return best.lines;
+      if (maxLines < 3) return null;
+      const lines = []; let cur = "";
+      for (const c of ch) {
+        if (tw(cur + c, size, weight) <= avail) { cur += c; continue; }
+        if (!cur) return null;
+        lines.push(cur.trim()); cur = c === " " ? "" : c;
+        if (lines.length > 3) return null;
+      }
+      if (cur.trim()) lines.push(cur.trim());
+      if (lines.length > 3 || lines.some((l) => [...l].length < 2)) return null;
+      return lines;
+    }
+
+    lg.each(function (d) {
+      const W_ = w(d), H_ = hgt(d);
+      const pad = 6;
+      if (W_ < pad * 2 + 12 || H_ < 18) return;
+      const zero = d.data.n === 0;
+      const fill = zero ? MUTED : INK;
+      const weight = d.data.tier === 0 && !zero ? 700 : 600;
+      const name = d.data.term;
+      const lineH = (s) => Math.round(s * 1.25);
+      // 큰 칸은 15px, 보통 13px, 최소 12px — 못 맞추면 한 단계 작게
+      const big = W_ >= 150 && H_ >= 72;
+      const tryFit = (dotW, topOff) => {
+        for (const s of big ? [15, 13, 12] : [13, 12]) {
+          const ml = Math.min(3, Math.floor((H_ - pad * 2 - topOff) / lineH(s)));
+          if (ml < 1) continue;
+          const ls = wrapName(name, W_ - pad * 2 - dotW, s, weight, ml);
+          if (ls) return { lines: ls, size: s, dotW, topOff };
+        }
+        return null;
+      };
+      // 수집 쿼리 점(●)은 글 앞에, 폭이 모자라면 글 위에 따로 둔다
+      let fit = tryFit(d.data.query ? 11 : 0, 0);
+      if (!fit && d.data.query) fit = tryFit(0, 9);
+      const g = d3.select(this);
+      if (!fit) {
+        // 세로로 긴 칸: 글자를 한 자씩 세로로 쌓는다 (한글은 세워 써도 그대로 읽힌다)
+        const vs = 13, adv = vs + 1, dotH = d.data.query ? 9 : 0;
+        const chars = [...name.replace(/\s+/g, "")];
+        const needH = chars.length * adv + pad * 2 + dotH;
+        if (W_ >= vs + pad * 2 && H_ >= needH && chars.length >= 2) {
+          const cx = d.x0 + Math.min(W_ / 2, pad + vs * 0.5 + 1);
+          const top = d.y0 + pad;
+          if (d.data.query) g.append("circle").attr("cx", cx).attr("cy", top + 3.5).attr("r", 3.2).attr("fill", INK2);
+          const t = g.append("text").attr("text-anchor", "middle")
+            .attr("fill", fill).attr("font-size", vs).attr("font-weight", weight);
+          chars.forEach((c, i) => t.append("tspan").attr("x", cx).attr("y", top + dotH + adv * (i + 1) - 2).text(c));
+        }
+        return; // 그래도 안 들어가면 라벨 없이 (툴팁·표에서 확인)
+      }
+      const { lines, size, dotW, topOff } = fit;
+      let y = d.y0 + pad + topOff + size * 0.92;
+      if (d.data.query) {
+        if (dotW) g.append("circle").attr("cx", d.x0 + pad + 4).attr("cy", y - size * 0.33).attr("r", 3.2).attr("fill", INK2);
+        else g.append("circle").attr("cx", d.x0 + pad + 3.5).attr("cy", d.y0 + pad + 3.5).attr("r", 3.2).attr("fill", INK2);
+      }
+      const t = g.append("text").attr("x", d.x0 + pad + dotW).attr("y", y)
+        .attr("fill", fill).attr("font-size", size).attr("font-weight", weight);
+      lines.forEach((ln, i) => {
+        t.append("tspan").attr("x", d.x0 + pad + (i === 0 ? dotW : 0)).attr("dy", i === 0 ? 0 : lineH(size)).text(ln);
+      });
+      y += lineH(size) * (lines.length - 1);
+      // 마지막 줄: 건수 (+ 짧은 부가 정보)
+      const l2Size = Math.max(12, size - 2);
+      if (d.y1 - pad >= y + l2Size + 4) {
+        let l2 = `${fmt(d.data.n)}건`;
+        const extra = d.data.subtag ? "소태그" : d.data.act ? d.data.kindLabel : d.data.authOnly ? "발신주체" : d.data.tier === 0 && !zero ? "핵심" : "";
+        const availL2 = W_ - pad * 2;
+        if (extra && tw(`${l2} · ${extra}`, l2Size, 500) <= availL2) l2 = `${l2} · ${extra}`;
+        if (tw(l2, l2Size, 500) <= availL2) {
+          g.append("text").attr("x", d.x0 + pad).attr("y", y + l2Size + 4)
+            .attr("fill", zero ? MUTED : INK2).attr("font-size", l2Size).attr("font-weight", 500).text(l2);
+        }
+      }
+    });
+
+    // 툴팁 (마우스 올림 / 탭 / 키보드 포커스)
+    lg.on("pointerenter", (ev, d) => { if (ev.pointerType === "mouse") showTip(d, ev.clientX, ev.clientY); })
+      .on("pointermove", (ev, d) => { if (ev.pointerType === "mouse" && !pinned) showTip(d, ev.clientX, ev.clientY); })
+      .on("pointerleave", () => { if (!pinned) hideTip(); })
+      .on("focus", function (ev, d) { const r = this.getBoundingClientRect(); showTip(d, r.left + r.width / 2, r.top + r.height / 2); })
+      .on("blur", () => { if (!pinned) hideTip(); })
+      .on("click", (ev, d) => {
+        ev.stopPropagation();
+        if (pinned === d) { pinned = null; hideTip(); return; }
+        pinned = d; showTip(d, ev.clientX, ev.clientY);
+      });
+
+    svg.node().appendChild(overlay.node());
+    container.appendChild(svg.node());
+  }
+
+  // ---- 툴팁 ----
+  const tip = document.getElementById("tip");
+  let pinned = null;
+  function showTip(d, cx, cy) {
+    const g = groupOf(d), h = hueOf(d);
+    const meta = [];
+    meta.push(tierLabel(d));
+    if (d.data.query) meta.push("● 네이버 수집 쿼리");
+    if (d.data.requires) meta.push("문맥 필수어 있음");
+    if (d.data.subtag) meta.push("KB금융 소태그");
+    const sub = d.parent && d.parent.data.level === "sub" ? ` · ${d.parent.data.label.replace(/\s*\(.*$/, "")}` : "";
+    const nText = d.data.act ? `법/정책 기사 ${fmt(M.legalTagged)}건 중 <b>${fmt(d.data.n)}</b>건에 등장` : `최근 30일 매칭 <b>${fmt(d.data.n)}</b>건`;
+    tip.innerHTML =
+      `<span class="tip-tag" style="background:${h.t1};color:${h.ink}">${g.data.label}${sub}</span>` +
+      `<div class="tip-term">${d.data.term}</div>` +
+      `<div class="tip-n">${nText}</div>` +
+      `<div class="tip-meta">${meta.join(" · ")}</div>`;
+    tip.hidden = false;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const r = tip.getBoundingClientRect();
+    let x = cx + 14, y = cy + 14;
+    if (x + r.width > vw - 8) x = Math.max(8, cx - r.width - 14);
+    if (y + r.height > vh - 8) y = Math.max(8, cy - r.height - 14);
+    tip.style.left = `${x}px`; tip.style.top = `${y}px`;
+  }
+  function hideTip() { tip.hidden = true; }
+  document.addEventListener("click", () => { pinned = null; hideTip(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { pinned = null; hideTip(); } });
+
+  // ---- 렌더 (데스크톱·인쇄 = 트리맵 하나 / 모바일 = 태그별로 쌓기) ----
+  const mapEl = document.getElementById("map");
+  let lastKey = "";
+  function render(force) {
+    if (!window.d3) {
+      mapEl.innerHTML = '<div class="card fallback">그래프 라이브러리(d3)를 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 새로고침해 주세요. 아래 표에서 같은 내용을 볼 수 있습니다.</div>';
+      return;
+    }
+    const print = isPrint();
+    const cw = mapEl.clientWidth || document.documentElement.clientWidth;
+    const stacked = !print && cw < 760;
+    const key = `${print ? "p" : stacked ? "s" : "d"}:${cw}`;
+    if (!force && key === lastKey) return;
+    lastKey = key;
+    pinned = null; hideTip();
+    mapEl.innerHTML = "";
+
+    if (stacked) {
+      const W = cw - 20;
+      const grand = d3.sum(groups, (g) => hierarchy(g).value);
+      for (const g of groups) {
+        const card = document.createElement("div");
+        card.className = "card stack";
+        card.style.padding = "10px";
+        const root = hierarchy(g);
+        // 세로 길이는 매칭 수에 비례 (최소 170px, 최대 820px)
+        const H = Math.round(Math.min(820, Math.max(170, (root.value / grand) * 3200)));
+        draw(card, layout(root, W, H), W, H);
+        mapEl.appendChild(card);
+      }
+      return;
+    }
+    const card = document.createElement("div");
+    card.className = "card";
+    const W = print ? Math.min(cw, 1062) - 12 : cw - 24;
+    const H = print ? 556 : Math.round(W * 0.6);
+    draw(card, layout(hierarchy(DATA.tree, 0.012), W, H), W, H);
+    mapEl.appendChild(card);
+  }
+
+  // ---- 표 (그래프의 쌍둥이 — 모든 값은 여기서도 읽힌다) ----
+  function buildTable() {
+    const body = document.getElementById("tbl-body");
+    let total = 0;
+    const rows = (leavesArr, h) => {
+      const sorted = [...leavesArr].sort((a, b) => b.n - a.n || a.term.localeCompare(b.term, "ko"));
+      total += sorted.length;
+      return `<table><thead><tr><th>키워드</th><th class="num">매칭</th><th>등급</th><th>비고</th></tr></thead><tbody>` +
+        sorted.map((d) => {
+          const grade = d.act ? `판정어 · ${d.kindLabel}` : d.authOnly ? `T${d.tier} · 발신주체` : d.tier === 0 ? "T0 핵심" : `T${d.tier}`;
+          const note = [d.subtag ? "소태그" : "", d.requires ? "문맥 필수어" : "", d.act ? d.grade : ""].filter(Boolean).join(" · ");
+          return `<tr><td>${d.query ? '<span class="q" title="네이버 수집 쿼리"></span>' : ""}${d.term}</td>` +
+            `<td class="num${d.n === 0 ? " zero" : ""}">${fmt(d.n)}</td><td>${grade}</td><td>${note}</td></tr>`;
+        }).join("") + `</tbody></table>`;
+    };
+    let html = "";
+    for (const g of groups) {
+      const h = HUES[g.hue];
+      const tot = g.total != null ? `<small>${g.totalLabel} ${fmt(g.total)}건</small>` : "";
+      html += `<h3><span class="sw" style="background:${h.t0};border-color:${h.ink}" aria-hidden="true"></span>${g.label} ${tot}</h3>`;
+      const subs = g.children.filter((c) => c.level === "sub");
+      if (subs.length) {
+        for (const s of subs) {
+          const st = s.total != null ? ` · ${s.totalLabel} ${fmt(s.total)}건` : "";
+          html += `<h4>${s.label}${st}</h4>` + rows(s.children, h);
+        }
+      } else {
+        html += rows(g.children, h);
+      }
+    }
+    body.innerHTML = html;
+    document.getElementById("tbl-summary").textContent = `전체 키워드 표 보기 (${fmt(total)}개 · 태그별 매칭 수 · 등급 · 수집 여부)`;
+  }
+
+  buildTable();
+  if (PRINT_PARAM) document.getElementById("tbl").open = true;
+  render(true);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render(true));
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => render(false), 120); });
+  window.addEventListener("beforeprint", () => { document.getElementById("tbl").open = true; render(true); });
+  window.addEventListener("afterprint", () => render(true));
+})();
+</script>
+</body>
+</html>

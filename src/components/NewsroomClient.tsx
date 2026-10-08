@@ -30,6 +30,8 @@ type NewsTag = {
   legal?: boolean;
   /** 데스크 안에서 제목·요약을 추가로 좁히는 검색어 */
   q?: string;
+  /** 같은 사건의 중복 기사(is_rep=false)도 받는다 — 언급이 드문 회사명 태그용 */
+  dupes?: boolean;
   hint?: string;
 };
 
@@ -71,11 +73,14 @@ const TAGS: NewsTag[] = [
     hint: "KB국민카드 관련 뉴스",
   },
   {
+    // 데스크(own)를 걸지 않는다 — 데스크는 제목 근거로만 붙는데 회사명은 거의 본문에만 나와
+    // desk=own AND q 로는 실데이터에서 0건이었다. 언급 자체가 드물어(30일 2건) 같은 사건의
+    // 중복 기사도 함께 받는다 — 회사명이 든 쪽이 대표 기사가 아닐 때가 많다
     id: "kbci",
     label: "KB신용정보",
-    desk: "own",
     q: "KB신용정보",
-    hint: "KB신용정보 관련 뉴스",
+    dupes: true,
+    hint: "제목·요약에 KB신용정보가 언급된 기사 전부 (최근 30일)",
   },
   {
     id: "peers",
@@ -102,6 +107,13 @@ function legacyTagOf(params: { get(name: string): string | null }): string | und
 
 const PAGE = 30;
 const LIMIT = 150;
+
+// 받침 유무로 이/가 — 마지막 글자가 한글이 아니면 '이(가)'로 둔다 ("KB신용정보가", "국민카드가")
+function subjectJosa(word: string): string {
+  const code = word.charCodeAt(word.length - 1);
+  if (code < 0xac00 || code > 0xd7a3) return "이(가)";
+  return (code - 0xac00) % 28 ? "이" : "가";
+}
 
 function logSearch(query: string) {
   fetch("/api/search-log", {
@@ -169,6 +181,8 @@ export default function NewsroomClient() {
     const effectiveQ = q || tag.q || "";
     if (effectiveQ) sp.set("q", effectiveQ);
     if (tag.desk) sp.set("desk", tag.desk);
+    // 내장 검색어로 동작하는 동안만 — 사용자 검색어가 태그를 대신하면 다른 검색과 같이 대표 기사만
+    if (tag.dupes && !q) sp.set("dupes", "1");
     if (tag.legal) {
       LEGAL_KINDS.forEach((k) => sp.append("kind", k));
       // 법/정책은 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
@@ -261,7 +275,8 @@ export default function NewsroomClient() {
 
   // 화면 제목은 선택한 태그를 그대로 따른다 — 전체면 전체, 채권추심이면 채권추심
   const heading = q ? `“${q}” 검색 결과` : tag.label;
-  // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융)
+  // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융).
+  // 데스크 없는 검색어 태그(KB신용정보)는 전체 검색과 같아져 '전체'로 표기된다
   const scope = q && tag.q ? (TAGS.find((t) => t.desk === tag.desk && !t.q) ?? tag) : tag;
   const hint = tag.hint;
 
@@ -457,9 +472,14 @@ export default function NewsroomClient() {
         ) : items.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[15px] font-bold text-gray-900">
-              {q ? `“${q}”(으)로 찾은 기사가 없습니다` : "조건에 맞는 기사가 없습니다"}
+              {q
+                ? `“${q}”(으)로 찾은 기사가 없습니다`
+                : tag.q
+                  ? `${tag.q}${subjectJosa(tag.q)} 언급된 기사가 없습니다`
+                  : "조건에 맞는 기사가 없습니다"}
             </p>
-            {q && (
+            {/* 검색어 태그(KB신용정보 등)는 검색과 같은 범위 — 왜 비었는지 같은 말로 밝힌다 */}
+            {(q || tag.q) && (
               <p className="mt-1 text-[13.5px] text-gray-600">
                 검색은 최근 30일 보관 기사에서 찾습니다
               </p>
@@ -571,14 +591,18 @@ function Seg({
 
 // 썸네일은 실제 이미지가 있을 때만 붙으므로 대기 화면도 글줄만 그린다
 function Skeleton() {
+  // FeedRow와 같은 뼈대(알약·제목 2줄·메타 + 오른쪽 4:3 썸네일) — 행당 ≈143px로 실제 행(147~166px)과 맞춘다
   return (
     <div className="divide-y divide-[var(--line)]">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="py-3.5 sm:py-5">
-          <div className="h-[22px] w-16 animate-pulse rounded-full bg-gray-200" />
-          <div className="mt-2 h-5 w-full animate-pulse rounded bg-gray-200" />
-          <div className="mt-1.5 h-5 w-2/3 animate-pulse rounded bg-gray-200" />
-          <div className="mt-2.5 h-4 w-32 animate-pulse rounded bg-gray-100" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-start gap-3.5 py-[18px] sm:gap-5 sm:py-5">
+          <div className="min-w-0 flex-1">
+            <div className="h-[22px] w-16 animate-pulse rounded-full bg-gray-200" />
+            <div className="mt-2 h-[22px] w-full animate-pulse rounded bg-gray-200" />
+            <div className="mt-1.5 h-[22px] w-4/5 animate-pulse rounded bg-gray-200" />
+            <div className="mt-[9px] h-[18px] w-36 animate-pulse rounded bg-gray-100" />
+          </div>
+          <div className="h-[84px] w-[112px] shrink-0 animate-pulse rounded-xl bg-gray-200 sm:h-[96px] sm:w-[128px]" />
         </div>
       ))}
     </div>
