@@ -331,7 +331,7 @@ export default function NewsroomClient() {
           </form>
         </div>
 
-        <div className="border-t border-[var(--line)] px-3 py-2.5 sm:flex sm:items-start sm:gap-2.5 sm:px-4">
+        <div className="border-t border-[var(--line)] px-3 py-3.5 sm:flex sm:items-start sm:gap-2.5 sm:px-4">
           {/* 기간·정렬과 같은 문법의 구획 라벨 — 첫 줄 칩(40px)과 세로 중앙 정렬.
               모바일은 칩 줄을 넓게 쓰려고 라벨을 뺀다 */}
           <span className="group-label hidden leading-[40px] sm:block">태그</span>
@@ -341,7 +341,7 @@ export default function NewsroomClient() {
             <ul
               ref={chipsRef}
               aria-label="태그"
-              className="-my-1 -ml-1 -mr-3 flex gap-1.5 overflow-x-auto py-1 pl-1 pr-3 [scrollbar-width:none] sm:-mr-1 sm:flex-wrap sm:overflow-visible sm:pr-1 [&::-webkit-scrollbar]:hidden"
+              className="-my-1 -ml-1 -mr-3 flex gap-2 overflow-x-auto py-1 pl-1 pr-3 [scrollbar-width:none] sm:-mr-1 sm:flex-wrap sm:overflow-visible sm:pr-1 [&::-webkit-scrollbar]:hidden"
             >
               {TAGS.map((t) => {
                 const active = tag.id === t.id;
