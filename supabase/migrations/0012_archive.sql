@@ -32,8 +32,8 @@ create trigger articles_merge_archive
   before update on public.articles
   for each row execute function public.articles_merge_archive();
 
--- 보존: 태그 없는 일반 기사 30일, 태그 기사 1년, 보관(keep) 기사 5년.
--- 태그 화면이 "최근 1년"을 보여 주려면 수집된 태그 기사가 1년은 남아 있어야 한다.
+-- 보존: 태그 없는 일반 기사 30일, 태그 기사 3년, 보관(keep) 기사 5년.
+-- 네이버 검색 색인이 15개월 안팎까지 내주므로 소급분을 다 담으려면 1년으론 모자란다.
 create or replace function public.purge_old_articles()
 returns void
 language sql
@@ -41,7 +41,7 @@ as $$
   delete from public.articles a
   where (
       (a.keep and a.pub_date < now() - interval '5 years')
-      or (not a.keep and a.desks <> '{}' and a.pub_date < now() - interval '365 days')
+      or (not a.keep and a.desks <> '{}' and a.pub_date < now() - interval '1095 days')
       or (not a.keep and a.desks = '{}' and a.pub_date < now() - interval '30 days')
     )
     and not exists (
