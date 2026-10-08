@@ -26,6 +26,11 @@ on:
         required: false
         default: "date"
         type: string
+      quote:
+        description: "1 이면 모든 검색어를 따옴표 정확검색으로(더 과거까지)"
+        required: false
+        default: "0"
+        type: string
 
 jobs:
   backfill:
@@ -40,6 +45,7 @@ jobs:
           FROM: ${{ inputs.from }}
           TERM: ${{ inputs.term }}
           SORT: ${{ inputs.sort }}
+          QUOTE: ${{ inputs.quote }}
         run: |
           set -euo pipefail
           call() {
@@ -47,12 +53,12 @@ jobs:
           }
           if [ -n "${TERM}" ]; then
             enc=$(printf '%s' "${TERM}" | jq -sRr @uri)
-            call "term=${enc}&pages=${PAGES}&sort=${SORT}" | jq -c '{upserted, terms}'
+            call "term=${enc}&pages=${PAGES}&sort=${SORT}&quote=${QUOTE}" | jq -c '{upserted, terms}'
             exit 0
           fi
           offset="${FROM}"
           while :; do
-            out=$(call "offset=${offset}&count=6&pages=${PAGES}&sort=${SORT}")
+            out=$(call "offset=${offset}&count=6&pages=${PAGES}&sort=${SORT}&quote=${QUOTE}")
             echo "$out" | jq -c '{offset, total, upserted, elapsedMs, terms: [.terms[] | {term, pages, fetched, kept, oldest: (.oldest // "" | .[0:10]), status}]}'
             # 시간에 걸려 일부만 처리된 검색어가 있으면 같은 offset 을 한 번 더
             partial=$(echo "$out" | jq -r '[.terms[] | select(.status == "partial")] | length')

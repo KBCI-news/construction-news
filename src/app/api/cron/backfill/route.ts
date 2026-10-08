@@ -71,6 +71,9 @@ export async function GET(request: NextRequest) {
   const count = Math.min(Math.max(Math.floor(Number(p.get("count") ?? DEFAULT_COUNT) || DEFAULT_COUNT), 1), 12);
   const pages = Math.min(Math.max(Math.floor(Number(p.get("pages") ?? MAX_PAGES) || MAX_PAGES), 1), MAX_PAGES);
   const sort = p.get("sort") === "sim" ? "sim" : "date";
+  // quote=1 : 모든 검색어를 따옴표 정확검색으로 — 느슨한 매칭이 1,000건을 금방 채우는
+  // 흔한 단어도 정확 일치만 받아 더 과거까지 닿는다(2차 소급용)
+  const quoteAll = p.get("quote") === "1";
 
   const terms = single ? [single] : QUERY_TERMS.slice(offset, offset + count).map((t) => t.term);
   const total = QUERY_TERMS.length;
@@ -81,7 +84,8 @@ export async function GET(request: NextRequest) {
 
   const fetchPage = async (term: string, page: number): Promise<NaverNewsItem[] | null> => {
     const start = (page - 1) * PER_PAGE + 1;
-    const url = `${NAVER_ENDPOINT}?query=${encodeURIComponent(naverQueryOf(term))}&display=${PER_PAGE}&start=${start}&sort=${sort}`;
+    const query = quoteAll && !term.startsWith('"') ? `"${term}"` : naverQueryOf(term);
+    const url = `${NAVER_ENDPOINT}?query=${encodeURIComponent(query)}&display=${PER_PAGE}&start=${start}&sort=${sort}`;
     for (let attempt = 0; attempt < 3; attempt++) {
       const res = await fetch(url, {
         headers: { "X-Naver-Client-Id": clientId, "X-Naver-Client-Secret": clientSecret },
@@ -201,6 +205,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     sort,
+    quote: quoteAll,
     offset: single ? null : offset,
     count: terms.length,
     total,
