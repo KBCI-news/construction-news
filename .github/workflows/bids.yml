@@ -2,9 +2,11 @@ name: Bid Notice Cron
 
 on:
   schedule:
-    # 1시간 간격. 정각(:00)은 GitHub Actions 큐가 가장 붐벼 수십 분씩 밀리므로
-    # 5분 뒤로 비켜 둔다. 수집 창(기본 3시간)이 지연을 흡수한다.
+    # 30분 간격 두 줄. 정각(:00)은 GitHub Actions 큐가 가장 붐벼 수십 분씩 밀리므로
+    # 비켜 둔다. 스케줄이 실제로는 2~6시간씩 밀리는 날이 많아(14일간 41% 미커버)
+    # 서버가 지난 회차 창 끝에 이어 붙여 빈틈을 메운다(최대 12시간).
     - cron: "5 * * * *"
+    - cron: "35 * * * *"
   workflow_dispatch:
     inputs:
       hours:

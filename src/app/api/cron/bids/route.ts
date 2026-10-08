@@ -24,6 +24,12 @@ export const maxDuration = 60;
 // 겹쳐 읽어도 bid_key 기준 upsert라 중복이 생기지 않는다.
 const DEFAULT_WINDOW_HOURS = 3;
 const MAX_WINDOW_HOURS = 24 * 30;
+// 지난 회차가 늦게 돌았으면 그 끝까지 거슬러 올라가 빈틈을 메운다(상한 12시간).
+// GitHub Actions 스케줄은 매시간이지만 실제로는 2~6.5시간씩 밀렸고(14일간 66회 중
+// 58회), 3시간 창으로는 전체 시간의 41%(138시간)가 한 번도 스캔되지 않았다 —
+// 새마을금고중앙회 채권추심 위임 재공고(10/2)가 그 틈에 빠졌다.
+const CATCHUP_MAX_HOURS = 12;
+const CATCHUP_OVERLAP_MS = 10 * 60_000;
 
 // 진단용:
 //   ?probe=1          살아 있는 API 경로와 응답 원형 확인
@@ -63,8 +69,32 @@ export async function GET(request: NextRequest) {
 
   const hours = clamp(Number(p.get("hours") ?? DEFAULT_WINDOW_HOURS), 1, MAX_WINDOW_HOURS);
   const to = parseWindowParam(p.get("to")) ?? new Date();
-  const from =
+  let from =
     parseWindowParam(p.get("from")) ?? new Date(to.getTime() - hours * 3_600_000);
+  let catchupFrom: string | null = null;
+  // 기본 창(파라미터 없음)일 때만 — 지난 성공 회차의 창 끝에 이어 붙인다
+  if (!p.get("from") && !p.get("hours") && !p.get("to")) {
+    try {
+      const { data: last } = await getSupabaseAdmin()
+        .from("bid_runs")
+        .select("window_to")
+        .eq("ok", true)
+        .order("ran_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const lastTo = last?.window_to ? new Date(last.window_to as string).getTime() : NaN;
+      if (Number.isFinite(lastTo)) {
+        const floor = to.getTime() - CATCHUP_MAX_HOURS * 3_600_000;
+        const wanted = lastTo - CATCHUP_OVERLAP_MS;
+        if (wanted < from.getTime()) {
+          from = new Date(Math.max(wanted, floor));
+          catchupFrom = from.toISOString();
+        }
+      }
+    } catch {
+      /* 이력 조회 실패 — 기본 창으로 */
+    }
+  }
 
   if (from >= to) {
     return NextResponse.json({ ok: false, error: "from이 to보다 나중입니다" }, { status: 400 });
@@ -299,6 +329,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    ...(catchupFrom ? { catchupFrom } : {}),
     window: { from: from.toISOString(), to: to.toISOString(), hours },
     divs,
     scanned,
