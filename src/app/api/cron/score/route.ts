@@ -37,6 +37,10 @@ const BACKLOG_SPAN_DAYS = 120;
 const OLD_ROWS_DEADLINE_MS = 42_000;
 // 이 시각을 넘기면 어떤 행이든 저장을 멈추고 다음 회차로 미룬다 — 504 보다 낫다
 const HARD_DEADLINE_MS = 52_000;
+// 창 안 행도 묶음이 그대로면 이 시간 안에는 다시 채점·저장하지 않는다 — 신선도 감쇠는
+// 여섯 시간에 한 번 반영해도 목록 순서에 차이가 없고, 7일 창 7천 행을 매 회차 다시
+// 채점·저장하는 것만으로 60초를 넘겼다
+const RESCORE_AFTER_MS = 6 * 3_600_000;
 
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;
@@ -58,10 +62,11 @@ type Row = {
   cluster_hosts: number | null;
   is_rep: boolean | null;
   matched_terms: string[] | null;
+  scored_at: string | null;
 };
 
 const SELECT =
-  "link,title,description,pub_date,source_host,cluster_id,cluster_hosts,is_rep,matched_terms";
+  "link,title,description,pub_date,source_host,cluster_id,cluster_hosts,is_rep,matched_terms,scored_at";
 
 async function fetchPaged(
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -130,6 +135,7 @@ export async function GET(request: NextRequest) {
   let backlogCount = 0;
   let backlogLeft = 0;
   let oldUnchanged = 0;
+  let freshUnchanged = 0;
   try {
     const tagged = await fetchPaged(
       supabase,
@@ -233,15 +239,17 @@ export async function GET(request: NextRequest) {
 
     for (const r of clusterRows) {
       const c = byLink.get(r.link);
-      if (oldLinks.has(r.link)) {
-        const same =
-          (c?.clusterId ?? r.link) === r.cluster_id &&
-          (c?.isRep ?? true) === r.is_rep &&
-          (c?.clusterHosts ?? 1) === (r.cluster_hosts ?? 1);
-        if (same) {
-          oldUnchanged += 1;
-          continue;
-        }
+      const same =
+        (c?.clusterId ?? r.link) === r.cluster_id &&
+        (c?.isRep ?? true) === r.is_rep &&
+        (c?.clusterHosts ?? 1) === (r.cluster_hosts ?? 1);
+      if (same && oldLinks.has(r.link)) {
+        oldUnchanged += 1;
+        continue;
+      }
+      if (same && r.scored_at && now - new Date(r.scored_at).getTime() < RESCORE_AFTER_MS) {
+        freshUnchanged += 1;
+        continue;
       }
       const res = scoreOf(r, c?.clusterHosts ?? 1, c?.wireOnly ?? false);
       payload.set(r.link, {
@@ -457,9 +465,14 @@ export async function GET(request: NextRequest) {
 
   // 최신 기사부터 훑어 지표별로 가장 최근 값 하나만 남긴다.
   const found = new Map<string, { value: string; row: Row }>();
-  const scanned = [...indicatorRows, ...clusterRows, ...unscored].sort(
-    (a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime(),
-  );
+  // 지표는 "가장 최근 값"만 쓰므로 최근 48시간 행만 훑는다 — 창 전체(7천 행)를 매번
+  // 정규식으로 훑는 비용을 아낀다
+  const scanFloor = now - 48 * 3_600_000;
+  const scanned = [
+    ...indicatorRows,
+    ...clusterRows.filter((r) => new Date(r.pub_date).getTime() >= scanFloor),
+    ...unscored,
+  ].sort((a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime());
   for (const r of scanned) {
     // 지표는 게시물에 그대로 쓰이므로 신뢰할 만한 매체만 인정한다
     // (암호화폐·미등록 매체에서 뽑힌 수치가 올라오던 문제)
@@ -512,6 +525,7 @@ export async function GET(request: NextRequest) {
     backlog: backlogCount,
     backlogLeft,
     oldUnchanged,
+    freshUnchanged,
     deferred,
     elapsedMs: Date.now() - startedAt,
     backfilled: unscored.length,
