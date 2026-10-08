@@ -3,7 +3,7 @@ import { POLL_MINUTES, QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
-import { isKeepTerm } from "@/lib/archive";
+import { isKeepTerm, keepMatches } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -167,7 +167,9 @@ export async function GET(request: NextRequest) {
       importance_parts: res.parts,
       scored_at: new Date(nowMs).toISOString(),
       query_terms: Array.from(termsByLink.get(item.link) ?? []),
-      keep: Array.from(termsByLink.get(item.link) ?? []).some(isKeepTerm),
+      keep:
+        Array.from(termsByLink.get(item.link) ?? []).some(isKeepTerm) &&
+        keepMatches(item.title, item.description),
     });
   }
 

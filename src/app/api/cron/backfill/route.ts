@@ -3,7 +3,7 @@ import { QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
-import { isKeepTerm, retentionCutoff } from "@/lib/archive";
+import { isKeepTerm, keepMatches, retentionCutoff } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -106,7 +106,9 @@ export async function GET(request: NextRequest) {
 
   const runTerm = async (term: string) => {
     const cutoff = retentionCutoff(term, nowMs).getTime();
-    const keep = isKeepTerm(term);
+    const keepTerm = isKeepTerm(term);
+    // 태그가 안 붙는 기사는 어차피 30일 뒤 정리된다 — 그보다 오래된 건 저장하지 않는다
+    const generalCutoff = nowMs - 30 * 86_400_000;
     const report: TermReport = { term, pages: 0, fetched: 0, kept: 0, oldest: null, newest: null, status: "ok" };
     for (let page = 1; page <= pages; page++) {
       // 함수 시간 상한(60초) 안에서만 — 남은 페이지는 다음 회차의 같은 offset 으로 다시 돈다
@@ -132,11 +134,12 @@ export async function GET(request: NextRequest) {
           olderThanCutoff = true;
           continue;
         }
-        report.kept += 1;
+        const keep = keepTerm && keepMatches(item.title, item.description);
         const existing = byLink.get(item.link);
         if (existing) {
           if (!existing.query_terms.includes(term)) existing.query_terms.push(term);
           existing.keep = existing.keep || keep;
+          report.kept += 1;
           continue;
         }
         const res = scoreArticle({
@@ -146,6 +149,8 @@ export async function GET(request: NextRequest) {
           sourceHost: hostOf(item.originallink || item.link),
           now: nowMs,
         });
+        if (!keep && res.desks.length === 0 && pub.getTime() < generalCutoff) continue;
+        report.kept += 1;
         byLink.set(item.link, {
           link: item.link,
           original_link: item.originallink || null,

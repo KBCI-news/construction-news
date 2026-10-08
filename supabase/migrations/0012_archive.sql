@@ -15,11 +15,14 @@ returns trigger
 language plpgsql
 as $$
 begin
-  new.keep := old.keep or new.keep;
-  new.query_terms := (
-    select coalesce(array_agg(distinct t order by t), '{}')
-    from unnest(old.query_terms || new.query_terms) as t
-  );
+  -- 보관함 정리(keep 해제)처럼 의도한 갱신은 app.archive_raw=1 로 합치기를 건너뛴다
+  if coalesce(current_setting('app.archive_raw', true), '') <> '1' then
+    new.keep := old.keep or new.keep;
+    new.query_terms := (
+      select coalesce(array_agg(distinct t order by t), '{}')
+      from unnest(old.query_terms || new.query_terms) as t
+    );
+  end if;
   return new;
 end;
 $$;
