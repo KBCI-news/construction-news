@@ -50,4 +50,7 @@ export type ArticleRow = {
   cluster_hosts: number;
   is_rep: boolean;
   scored_at: string | null;
+  // 보관함(0012_archive.sql): 정리에서 빼는 표시와 이 기사를 가져온 검색어들
+  keep: boolean;
+  query_terms: string[];
 };

@@ -30,6 +30,8 @@ type NewsTag = {
   legal?: boolean;
   /** 데스크 안에서 제목·요약을 추가로 좁히는 검색어 */
   q?: string;
+  /** 수집 검색어로 찾는다(보관함) — 요약에 회사명이 안 보여도 그 검색어로 가져온 기사면 포함 */
+  qt?: string;
   /** 같은 사건의 중복 기사(is_rep=false)도 받는다 — 언급이 드문 회사명 태그용 */
   dupes?: boolean;
 };
@@ -77,7 +79,7 @@ const TAGS: NewsTag[] = [
     // 중복 기사도 함께 받는다 — 회사명이 든 쪽이 대표 기사가 아닐 때가 많다
     id: "kbci",
     label: "KB신용정보",
-    q: "KB신용정보",
+    qt: "KB신용정보",
     dupes: true,
   },
   {
@@ -139,6 +141,8 @@ export default function NewsroomClient() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [visible, setVisible] = useState(PAGE);
+  // 서버에서 이어 받기 — 마지막 묶음이 LIMIT 보다 적게 오면 더 없는 것
+  const [moreState, setMoreState] = useState<"idle" | "loading" | "exhausted">("idle");
   const [input, setInput] = useState(q);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -188,6 +192,7 @@ export default function NewsroomClient() {
     // 사용자가 검색하면 태그의 내장 검색어(예: KB국민카드)보다 우선한다
     const effectiveQ = q || tag.q || "";
     if (effectiveQ) sp.set("q", effectiveQ);
+    if (tag.qt) sp.set("qt", tag.qt);
     if (tag.desk) sp.set("desk", tag.desk);
     // 내장 검색어로 동작하는 동안만 — 사용자 검색어가 태그를 대신하면 다른 검색과 같이 대표 기사만
     if (tag.dupes && !q) sp.set("dupes", "1");
@@ -209,6 +214,7 @@ export default function NewsroomClient() {
     setLoading(true);
     setError(null);
     setVisible(PAGE);
+    setMoreState("idle");
 
     fetch(`/api/feed?${queryString}`, { signal: controller.signal })
       .then(async (res) => {
@@ -232,6 +238,31 @@ export default function NewsroomClient() {
   }, [queryString, reloadKey]);
 
   const retry = () => setReloadKey((k) => k + 1);
+
+  // 목록 끝에서 다음 150건을 서버에서 이어 받는다 — 보관함(1년·5년)을 끝까지 넘길 수 있게.
+  // 관련도 정렬은 서버가 후보를 다시 섞어 offset 이 맞물리지 않으므로 최신순·중요도순에서만
+  const loadMore = () => {
+    if (moreState !== "idle") return;
+    setMoreState("loading");
+    fetch(`/api/feed?${queryString}&offset=${items.length}`)
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "요청 실패");
+        return json as FeedResponse;
+      })
+      .then((json) => {
+        const got = json.items ?? [];
+        const seen = new Set(items.map((it) => it.link));
+        const fresh = got.filter((it) => !seen.has(it.link));
+        setItems((prev) => [...prev, ...fresh]);
+        setVisible((v) => v + Math.min(PAGE, fresh.length));
+        setMoreState(got.length < LIMIT ? "exhausted" : "idle");
+      })
+      .catch((err: unknown) => {
+        console.error(err);
+        setMoreState("idle");
+      });
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -271,8 +302,9 @@ export default function NewsroomClient() {
 
   const shown = items.slice(0, visible);
   const remaining = items.length - shown.length;
-  // API가 LIMIT건에서 자르므로 LIMIT건이면 "그 이상"일 수 있다
-  const capped = items.length >= LIMIT;
+  // API가 LIMIT건씩 자르므로 마지막 묶음이 LIMIT건이면 "그 이상"일 수 있다
+  const capped = items.length >= LIMIT && moreState !== "exhausted";
+  const canLoadMore = capped && sort !== "relevance";
   // 전체(scope=tagged)와 관련도 검색은 API가 후보를 넉넉히 받은 뒤 한 번 더 거른다(route.ts fetchLimit) —
   // LIMIT건보다 적게 와도 뒤에 더 있을 수 있어 '마지막 기사'라고 단정하지 않는다
   const postFiltered =
@@ -540,6 +572,17 @@ export default function NewsroomClient() {
                   className="btn-soft px-6"
                 >
                   {Math.min(PAGE, remaining)}건 더 보기
+                </button>
+              </div>
+            ) : canLoadMore ? (
+              <div className="mt-5 text-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={moreState === "loading"}
+                  className="btn-soft px-6 disabled:opacity-60"
+                >
+                  {moreState === "loading" ? "불러오는 중…" : "이전 기사 더 불러오기"}
                 </button>
               </div>
             ) : capped ? (
