@@ -37,6 +37,11 @@ type NewsTag = {
 /** 주소에 태그가 없을 때 — 담당자 대부분의 첫 관심사가 추심이라 전체 대신 채권추심으로 연다 */
 const DEFAULT_TAG = "collection";
 
+// 문서를 새로 연 첫 화면은 늘 채권추심이어야 한다 — 새로고침하거나 즐겨찾기·외부
+// 브라우저로 다시 열 때 전에 보던 태그(주소의 tag=)가 남아 있으면 "왜 다른 게 떠 있지"가
+// 된다. 기사를 열었다 돌아오는 길(앱 안 이동)은 이 모듈이 살아 있어 되돌리지 않는다.
+let freshDocument = true;
+
 const TAGS: NewsTag[] = [
   { id: "all", label: "전체" },
   {
@@ -140,6 +145,17 @@ export default function NewsroomClient() {
   const chipsRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => setInput(q), [q]);
+
+  useEffect(() => {
+    if (!freshDocument) return;
+    freshDocument = false;
+    if (tagId === DEFAULT_TAG) return;
+    const next = new URLSearchParams(params.toString());
+    ["tag", "desk", "legal"].forEach((k) => next.delete(k));
+    router.replace(next.toString() ? `/?${next}` : "/");
+    // 문서당 한 번만 — 마운트 시점의 주소만 본다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (params.get("tag")) return;

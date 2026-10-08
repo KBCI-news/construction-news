@@ -15,6 +15,15 @@ export type ClusterInput = {
   pubDate: string;
   sourceHost?: string | null;
   matchedTerms?: string[];
+  /** 네이버 요약(스니펫). 같은 보도자료 전재는 제목이 달라도 이 본문이 같다 */
+  description?: string | null;
+};
+
+export type ClusterSummary = {
+  id: string;
+  links: string[];
+  /** 구성원들이 묶음 프로필과 얼마나 닮았는지(가중 자카드 평균) — 낮으면 오병합 의심 */
+  coherence: number;
 };
 
 export type ClusterAssignment = {
@@ -48,6 +57,13 @@ const OVERLAP_THRESHOLD = 0.35;
 const OVERLAP_MIN_SHARED = 2;
 // 제목 글자 2-gram이 이만큼 겹치면 표현이 거의 같은 전재 기사다
 const DICE_VERBATIM = 0.6;
+// 요약(네이버 스니펫) 어절 3-gram 다이스 — 같은 보도자료를 받아쓴 기사는 제목을
+// 달리 뽑아도("KB금융 세종학당 연계 한국어 알리기 지속") 본문 문장이 그대로 겹친다.
+// 서로 다른 사안은 같은 주제여도 문장이 같을 일이 없어 0.4면 충분히 안전하다.
+const DESC_VERBATIM = 0.4;
+const DESC_MAX_CHARS = 240;
+// 묶음마다 비교용으로 들고 있는 요약 수 — 보도자료 전재는 처음 몇 건이면 대표성이 있다
+const DESC_KEEP_PER_CLUSTER = 6;
 // 한 묶음이 걸칠 수 있는 최대 날짜 수(KST). 사흘짜리 사안(예고→부과→반응)은 잇고,
 // 그 이상은 새 묶음으로 끊어 '개인정보 유출'류 상시 주제가 한 덩어리로 자라지 않게 한다.
 const MAX_SPAN_DAYS = 3;
@@ -90,19 +106,33 @@ const TOKEN_STOP = new Set([
 const PARTICLE =
   /(에서는|으로는|에게는|까지|부터|에서|에게|으로|이라|라며|처럼|보다|마다|조차|마저|밖에|이나|이며|은|는|이|가|을|를|에|의|로|와|과|도|만)$/u;
 
+const AMOUNT_UNIT: Record<string, number> = {
+  조: 1e12,
+  천억: 1e11,
+  백억: 1e10,
+  억: 1e8,
+  천만: 1e7,
+  백만: 1e6,
+  만: 1e4,
+  천: 1e3,
+};
+
 /**
- * 금액 표기를 통일한다. 같은 제재를 두고 매체마다
- * "539억" · "539억원" · "539.7억" · "540억" 처럼 달리 쓰기 때문에
- * 그대로 두면 같은 사건인데도 공유 토큰이 잡히지 않는다.
+ * 금액·인원 표기를 하나의 수로 통일한다. 같은 사건을 두고 매체마다
+ * "539억" · "539억원" · "539.7억" · "540억", "1.6조" · "1조6000억원",
+ * "18만3000명" · "18.3만 명" 처럼 달리 쓰기 때문에 그대로 두면 공유 토큰이 안 잡힌다.
+ * 유효숫자 두 자리로 맞춰 반올림 차이(539 vs 540)를 흡수한다.
+ * (단위 앞 수만 보고 "2만"으로 자르면 "2만5000명 유출"과 "2만4천 명 노출"이 같은
+ *  사건이 됐다 — 뒤에 붙은 수까지 더한다)
  */
 function normalizeAmount(token: string): string | null {
-  const m = token.match(/^(\d+(?:\.\d+)?)(억|조|만|천)/u);
+  const m = token.match(/^(\d+(?:\.\d+)?)(천억|백억|천만|백만|조|억|만|천)(?:(\d+)(억|만|천|백)?)?/u);
   if (!m) return null;
-  const value = Number(m[1]);
-  if (!Number.isFinite(value)) return null;
-  // 반올림 오차(539 vs 540)를 흡수하도록 10 단위로 맞춘다
-  const rounded = value >= 100 ? Math.round(value / 10) * 10 : Math.round(value);
-  return `${rounded}${m[2]}`;
+  let value = Number(m[1]) * AMOUNT_UNIT[m[2]];
+  if (m[3]) value += Number(m[3]) * (m[4] ? AMOUNT_UNIT[m[4]] ?? (m[4] === "백" ? 1e2 : 1) : 1);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const scale = Math.pow(10, Math.max(0, Math.floor(Math.log10(value)) - 1));
+  return `n${Math.round(value / scale) * scale}`;
 }
 
 /**
@@ -113,15 +143,25 @@ export function keyTokens(title: string): Set<string> {
   const raw = stripHtml(title)
     .replace(/\[[^\]]*\]/g, "")
     .toLowerCase()
+    // 소수점은 수의 일부("1.6조", "539.7억") — 구분자로 쪼개지지 않게 잠시 글자로 바꾼다
+    .replace(/(\d)\.(\d)/gu, "$1ㆍ$2")
     .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((tk) => tk.replace(/ㆍ/g, "."));
   const out = new Set<string>();
   for (const tk of raw) {
-    // 숫자 토큰은 조사를 떼지 않는다 — "85만"에서 '만'을 떼면 금액이 사라진다
     if (/^\d/.test(tk)) {
+      // 금액·인원이면 먼저 수로 통일한다 — 조사를 먼저 떼면 "85만"의 '만'이 사라진다
       const amount = normalizeAmount(tk);
-      if (amount) out.add(amount);
-      else if (tk.length >= 2) out.add(tk.replace(/(명|건|곳|개|원|년|월|일|시|분|배|차|호|회)$/u, "") || tk);
+      if (amount) {
+        out.add(amount);
+        continue;
+      }
+      // "3분의 1"의 '3분'은 단위가 아니라 사건의 수 — 단위를 떼어 한 글자가 되면 조사만 뗀 꼴을 쓴다
+      const noParticle = tk.replace(PARTICLE, "");
+      const noUnit = noParticle.replace(/(명|건|곳|개|원|년|월|일|시|분|배|차|호|회)$/u, "");
+      const pick = noUnit.length >= 2 ? noUnit : noParticle.length >= 2 ? noParticle : tk;
+      if (pick.length >= 2) out.add(pick);
       continue;
     }
     const stripped = tk.replace(PARTICLE, "");
@@ -157,6 +197,18 @@ function isDigest(title: string): boolean {
   return seps >= 3 && words <= 2;
 }
 
+/** 요약의 어절 3-gram. 앞머리의 "매체 = 기자명 기자" 꼬리표는 잘라낸다 */
+function descGrams(description: string | null | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!description) return out;
+  let text = stripHtml(description).replace(/\s+/g, " ").trim();
+  const byline = text.indexOf("기자");
+  if (byline >= 0 && byline < 40) text = text.slice(byline + 2).replace(/^[\s=|\]\)\-–—:,.]+/u, "");
+  const words = text.slice(0, DESC_MAX_CHARS).split(" ").filter(Boolean);
+  for (let i = 0; i + 2 < words.length; i++) out.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
+  return out;
+}
+
 // KST 기준 날짜 번호 — UTC로 나누면 09:00 KST 경계에서 같은 사안이 갈라진다
 function kstDayNum(pubDate: string): number {
   const d = new Date(pubDate);
@@ -175,6 +227,7 @@ type Prepared = {
   grams: Set<string>;
   tokens: string[];
   weight: number; // Σ w(token)
+  descGrams: Set<string>;
 };
 
 type Cluster = {
@@ -187,6 +240,7 @@ type Cluster = {
   // 그 날 가장 먼저 들어온 기사가 특이한 제목일 때 묶음 전체가 흔들렸다.
   profile: Map<string, number>;
   members: Prepared[];
+  descs: Set<string>[];
 };
 
 /**
@@ -201,6 +255,13 @@ type Cluster = {
  * - 역색인으로 토큰을 하나라도 공유하는 묶음만 후보로 본다 — O(n²)를 피한다.
  */
 export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
+  return clusterArticles(items).assignments;
+}
+
+export function clusterArticles(items: ClusterInput[]): {
+  assignments: ClusterAssignment[];
+  clusters: ClusterSummary[];
+} {
   const prepared: Prepared[] = items.map((it) => {
     const norm = normTitle(it.title);
     return {
@@ -211,6 +272,7 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
       grams: bigrams(norm),
       tokens: isDigest(it.title) ? [] : Array.from(keyTokens(it.title)),
       weight: 0,
+      descGrams: descGrams(it.description),
     };
   });
 
@@ -292,6 +354,18 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
     (m.shared >= OVERLAP_MIN_SHARED && m.overlap >= OVERLAP_THRESHOLD) ||
     (m.shared >= OVERLAP_MIN_SHARED && m.strong && m.jaccard >= SIM_WITH_STRONG);
   const scoreOf = (m: Match): number => Math.max(m.jaccard, m.shared >= OVERLAP_MIN_SHARED ? m.overlap : 0);
+  const descMatch = (grams: Set<string>, c: Cluster): number => {
+    if (grams.size < 6) return 0;
+    let best = 0;
+    for (const d of c.descs) {
+      const v = dice(grams, d);
+      if (v > best) best = v;
+    }
+    return best;
+  };
+  const addDesc = (c: Cluster, grams: Set<string>) => {
+    if (grams.size >= 6 && c.descs.length < DESC_KEEP_PER_CLUSTER) c.descs.push(grams);
+  };
 
   for (const day of days) {
     const sorted = buckets.get(day)!.slice().sort((a, b) => b.time - a.time);
@@ -319,8 +393,9 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
         }
         const m = compare(p, c);
         const d = dice(p.grams, c.repGrams);
-        if (!accept(m) && d < DICE_VERBATIM) continue;
-        const score = Math.max(scoreOf(m), d);
+        const dd = descMatch(p.descGrams, c);
+        if (!accept(m) && d < DICE_VERBATIM && dd < DESC_VERBATIM) continue;
+        const score = Math.max(scoreOf(m), d, dd);
         if (score > bestScore) {
           bestScore = score;
           best = c;
@@ -330,6 +405,7 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
       if (best) {
         best.members.push(p);
         best.norms.add(p.norm);
+        addDesc(best, p.descGrams);
         for (const t of p.tokens) best.profile.set(t, (best.profile.get(t) ?? 0) + 1);
         if (!best.days.has(day)) register(best, day, best.profile.keys());
         else register(best, day, p.tokens);
@@ -342,6 +418,7 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
           norms: new Set(p.norm ? [p.norm] : []),
           profile: new Map(p.tokens.map((t) => [t, 1])),
           members: [p],
+          descs: p.descGrams.size >= 6 ? [p.descGrams] : [],
         };
         clusters.push(c);
         register(c, day, p.tokens);
@@ -383,6 +460,10 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
       strong,
     };
   };
+  const descPairMatch = (a: Cluster, b: Cluster): boolean => {
+    for (const x of a.descs) for (const y of b.descs) if (dice(x, y) >= DESC_VERBATIM) return true;
+    return false;
+  };
   for (let pass = 0; pass < 2; pass++) {
     let merged = 0;
     for (const c of clusters) {
@@ -403,12 +484,13 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
         const lo = Math.min(c.firstDay, o.firstDay);
         const hi = Math.max(...c.days, ...o.days);
         if (hi - lo >= MAX_SPAN_DAYS) continue;
-        if (!accept(profileMatch(c, o))) continue;
+        if (!accept(profileMatch(c, o)) && !descPairMatch(c, o)) continue;
         // 먼저 생긴 묶음(firstDay가 이른 쪽)이 남는다
         const [keep, drop] = c.firstDay <= o.firstDay ? [c, o] : [o, c];
         for (const m of drop.members) keep.members.push(m);
         for (const nm of drop.norms) keep.norms.add(nm);
         for (const [t, cnt] of drop.profile) keep.profile.set(t, (keep.profile.get(t) ?? 0) + cnt);
+        for (const g of drop.descs) addDesc(keep, g);
         for (const day of new Set([...keep.days, ...drop.days])) register(keep, day, keep.profile.keys());
         dead.add(drop);
         merged++;
@@ -418,8 +500,14 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
   }
 
   const assignments: ClusterAssignment[] = [];
+  const summaries: ClusterSummary[] = [];
   for (const c of clusters) {
     if (dead.has(c)) continue;
+    const coherence =
+      c.members.length < 2
+        ? 1
+        : c.members.reduce((sum, m) => sum + compare(m, c).jaccard, 0) / c.members.length;
+    summaries.push({ id: c.id, links: c.members.map((m) => m.it.link), coherence });
     const hosts = new Set(c.members.map((m) => hostOfEntry(m.it)).filter(Boolean));
     const wireOnly =
       hosts.size > 0 && Array.from(hosts).every((h) => WIRE_HOSTS.has(h));
@@ -444,5 +532,5 @@ export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
     });
   }
 
-  return assignments;
+  return { assignments, clusters: summaries };
 }
