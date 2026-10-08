@@ -10,5 +10,6 @@ const MAP: Record<string, string> = {
 
 export default function CategoryRedirect({ params }: { params: { id: string } }) {
   const tag = MAP[params.id];
-  redirect(tag ? `/?tag=${tag}` : "/");
+  // "/"는 이제 기본 태그(채권추심)로 열리므로 전체는 tag=all로 명시한다
+  redirect(tag ? `/?tag=${tag}` : "/?tag=all");
 }

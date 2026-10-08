@@ -24,21 +24,22 @@ const RANGE_KEYS = Object.keys(RANGE_LABEL) as RangeKey[];
  * 화면 제목도 이 라벨을 그대로 쓴다.
  */
 type NewsTag = {
-  id: string; // URL의 tag= 값. 빈 문자열 = 전체
+  id: string; // URL의 tag= 값. "all" = 전체(태그 합집합)
   label: string;
   desk?: string;
   legal?: boolean;
   /** 데스크 안에서 제목·요약을 추가로 좁히는 검색어 */
   q?: string;
+  /** 같은 사건의 중복 기사(is_rep=false)도 받는다 — 언급이 드문 회사명 태그용 */
+  dupes?: boolean;
   hint?: string;
 };
 
+/** 주소에 태그가 없을 때 — 담당자 대부분의 첫 관심사가 추심이라 전체 대신 채권추심으로 연다 */
+const DEFAULT_TAG = "collection";
+
 const TAGS: NewsTag[] = [
-  {
-    id: "",
-    label: "전체",
-    hint: "태그가 붙은 기사를 모두 모았습니다 · 태그 밖 기사는 검색으로 찾으세요",
-  },
+  { id: "all", label: "전체" },
   {
     id: "collection",
     label: "채권추심",
@@ -72,6 +73,16 @@ const TAGS: NewsTag[] = [
     hint: "KB국민카드 관련 뉴스",
   },
   {
+    // 데스크(own)를 걸지 않는다 — 데스크는 제목 근거로만 붙는데 회사명은 거의 본문에만 나와
+    // desk=own AND q 로는 실데이터에서 0건이었다. 언급 자체가 드물어(30일 2건) 같은 사건의
+    // 중복 기사도 함께 받는다 — 회사명이 든 쪽이 대표 기사가 아닐 때가 많다
+    id: "kbci",
+    label: "KB신용정보",
+    q: "KB신용정보",
+    dupes: true,
+    hint: "제목·요약에 KB신용정보가 언급된 기사 전부 (최근 30일)",
+  },
+  {
     id: "peers",
     label: "신용정보업권",
     desk: "peers",
@@ -91,11 +102,18 @@ const LEGACY_TAG: Record<string, string> = {
 function legacyTagOf(params: { get(name: string): string | null }): string | undefined {
   const id = params.get("legal") === "1" ? "legal" : LEGACY_TAG[params.get("desk") ?? ""];
   // desk=constructor 같은 값이 객체 기본 속성을 집어 오지 않게 실제 태그 id만 받는다
-  return TAGS.some((t) => t.id && t.id === id) ? id : undefined;
+  return TAGS.some((t) => t.id === id) ? id : undefined;
 }
 
 const PAGE = 30;
 const LIMIT = 150;
+
+// 받침 유무로 이/가 — 마지막 글자가 한글이 아니면 '이(가)'로 둔다 ("KB신용정보가", "국민카드가")
+function subjectJosa(word: string): string {
+  const code = word.charCodeAt(word.length - 1);
+  if (code < 0xac00 || code > 0xd7a3) return "이(가)";
+  return (code - 0xac00) % 28 ? "이" : "가";
+}
 
 function logSearch(query: string) {
   fetch("/api/search-log", {
@@ -111,8 +129,8 @@ export default function NewsroomClient() {
 
   const q = params.get("q") ?? "";
   // 옛 북마크는 주소를 바꾸기 전 첫 화면부터 옮겨 갈 태그로 그린다 — 전체 목록이 한 번 번쩍이지 않게
-  const tagId = params.get("tag") || legacyTagOf(params) || "";
-  const tag = TAGS.find((t) => t.id === tagId) ?? TAGS[0];
+  const tagId = params.get("tag") || legacyTagOf(params) || DEFAULT_TAG;
+  const tag = TAGS.find((t) => t.id === tagId) ?? TAGS.find((t) => t.id === DEFAULT_TAG)!;
   const rangeParam = params.get("range") as RangeKey;
   // 모르는 값은 API도 전체로 처리한다 — 요약 줄이 빈 라벨을 보이지 않게 여기서 맞춘다
   const range: RangeKey = RANGE_KEYS.includes(rangeParam) ? rangeParam : "all";
@@ -163,12 +181,14 @@ export default function NewsroomClient() {
     const effectiveQ = q || tag.q || "";
     if (effectiveQ) sp.set("q", effectiveQ);
     if (tag.desk) sp.set("desk", tag.desk);
+    // 내장 검색어로 동작하는 동안만 — 사용자 검색어가 태그를 대신하면 다른 검색과 같이 대표 기사만
+    if (tag.dupes && !q) sp.set("dupes", "1");
     if (tag.legal) {
       LEGAL_KINDS.forEach((k) => sp.append("kind", k));
       // 법/정책은 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
       // 무관한 일반 법조 기사(하도급 과징금, 헌재 각하 등)를 거른다
       sp.set("scope", "curated");
-    } else if (!tag.desk && !q) {
+    } else if (tag.id === "all" && !q) {
       // 전체 = 아래 태그들의 합집합. 태그 체계 밖(정보보호·부실채권 등)만 걸린
       // 기사와 태그 없는 일반 뉴스는 검색으로만 닿는다
       sp.set("scope", "tagged");
@@ -248,17 +268,17 @@ export default function NewsroomClient() {
   // 전체(scope=tagged)와 관련도 검색은 API가 후보를 넉넉히 받은 뒤 한 번 더 거른다(route.ts fetchLimit) —
   // LIMIT건보다 적게 와도 뒤에 더 있을 수 있어 '마지막 기사'라고 단정하지 않는다
   const postFiltered =
-    (!tag.desk && !tag.legal && !q) || (sort === "relevance" && Boolean(q || tag.q));
-  const narrowed = Boolean(tag.id) || range !== "all";
+    (tag.id === "all" && !q) || (sort === "relevance" && Boolean(q || tag.q));
+  const narrowed = tag.id !== "all" || range !== "all";
   const sortLabel =
     sort === "score" ? "중요도순" : sort === "relevance" ? "관련도순" : "최신순";
 
   // 화면 제목은 선택한 태그를 그대로 따른다 — 전체면 전체, 채권추심이면 채권추심
   const heading = q ? `“${q}” 검색 결과` : tag.label;
-  // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융)
+  // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융).
+  // 데스크 없는 검색어 태그(KB신용정보)는 전체 검색과 같아져 '전체'로 표기된다
   const scope = q && tag.q ? (TAGS.find((t) => t.desk === tag.desk && !t.q) ?? tag) : tag;
-  // 전체 태그의 검색은 scope=tagged 없이 조회해 태그 없는 기사도 나온다 — '태그 붙은 기사만' 안내를 그대로 두면 틀린 말이 된다
-  const hint = q && !tag.id ? "태그와 관계없이 검색합니다 · 태그 밖 기사도 함께 찾습니다" : tag.hint;
+  const hint = tag.hint;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -335,10 +355,10 @@ export default function NewsroomClient() {
               {TAGS.map((t) => {
                 const active = tag.id === t.id;
                 return (
-                  <li key={t.id || "all"} className="shrink-0">
+                  <li key={t.id} className="shrink-0">
                     <button
                       type="button"
-                      onClick={() => setParam({ tag: t.id || null })}
+                      onClick={() => setParam({ tag: t.id })}
                       aria-pressed={active}
                       className={`chip ${active ? "chip-on" : ""}`}
                     >
@@ -423,12 +443,12 @@ export default function NewsroomClient() {
                         : "최신순"
                   }`}
           </p>
-          {q && scope.id && (
+          {q && scope.id !== "all" && (
             <p className="w-full text-[13px] text-gray-600">
               {scope.label} 태그 안에서 찾은 결과 ·{" "}
               <button
                 type="button"
-                onClick={() => setParam({ tag: null })}
+                onClick={() => setParam({ tag: "all" })}
                 className="inline-flex min-h-[40px] items-center font-bold text-[#7A5E08] underline underline-offset-2"
               >
                 전체에서 찾기
@@ -452,9 +472,14 @@ export default function NewsroomClient() {
         ) : items.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-[15px] font-bold text-gray-900">
-              {q ? `“${q}”(으)로 찾은 기사가 없습니다` : "조건에 맞는 기사가 없습니다"}
+              {q
+                ? `“${q}”(으)로 찾은 기사가 없습니다`
+                : tag.q
+                  ? `${tag.q}${subjectJosa(tag.q)} 언급된 기사가 없습니다`
+                  : "조건에 맞는 기사가 없습니다"}
             </p>
-            {q && (
+            {/* 검색어 태그(KB신용정보 등)는 검색과 같은 범위 — 왜 비었는지 같은 말로 밝힌다 */}
+            {(q || tag.q) && (
               <p className="mt-1 text-[13.5px] text-gray-600">
                 검색은 최근 30일 보관 기사에서 찾습니다
               </p>
@@ -478,7 +503,7 @@ export default function NewsroomClient() {
               {narrowed && (
                 <button
                   type="button"
-                  onClick={() => setParam({ tag: null, range: null })}
+                  onClick={() => setParam({ tag: "all", range: null })}
                   className="btn-soft"
                 >
                   전체 기간 · 전체 태그로 보기
@@ -496,7 +521,7 @@ export default function NewsroomClient() {
                 <FeedRow
                   key={item.link}
                   item={item}
-                  pill={scope.id ? scope.label : undefined}
+                  pill={scope.id !== "all" ? scope.label : undefined}
                   highlight={q || undefined}
                 />
               ))}
@@ -566,14 +591,18 @@ function Seg({
 
 // 썸네일은 실제 이미지가 있을 때만 붙으므로 대기 화면도 글줄만 그린다
 function Skeleton() {
+  // FeedRow와 같은 뼈대(알약·제목 2줄·메타 + 오른쪽 4:3 썸네일) — 행당 ≈143px로 실제 행(147~166px)과 맞춘다
   return (
     <div className="divide-y divide-[var(--line)]">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="py-3.5 sm:py-5">
-          <div className="h-[22px] w-16 animate-pulse rounded-full bg-gray-200" />
-          <div className="mt-2 h-5 w-full animate-pulse rounded bg-gray-200" />
-          <div className="mt-1.5 h-5 w-2/3 animate-pulse rounded bg-gray-200" />
-          <div className="mt-2.5 h-4 w-32 animate-pulse rounded bg-gray-100" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-start gap-3.5 py-[18px] sm:gap-5 sm:py-5">
+          <div className="min-w-0 flex-1">
+            <div className="h-[22px] w-16 animate-pulse rounded-full bg-gray-200" />
+            <div className="mt-2 h-[22px] w-full animate-pulse rounded bg-gray-200" />
+            <div className="mt-1.5 h-[22px] w-4/5 animate-pulse rounded bg-gray-200" />
+            <div className="mt-[9px] h-[18px] w-36 animate-pulse rounded bg-gray-100" />
+          </div>
+          <div className="h-[84px] w-[112px] shrink-0 animate-pulse rounded-xl bg-gray-200 sm:h-[96px] sm:w-[128px]" />
         </div>
       ))}
     </div>

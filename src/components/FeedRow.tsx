@@ -37,58 +37,59 @@ export function FeedRow({
   // 법/정책을 골랐는데 기사 원소속(채권추심 등)이 뜨면 필터가 어긋난 것처럼 읽힌다.
   // 그 밖에는 태그 목록과 같은 이름으로만 표기한다.
   const pillText = pill ?? tagLabelOf(item);
+  // 여러 매체가 다룬 기사만 — 점수 없이 "큰 기사"임을 알리는 유일한 단서
+  const outlets = item.clusterHosts >= 3 ? `${item.clusterHosts}개 매체 보도` : null;
+  // 메타 조각: 앞에 '·'를 ::before로 그리고, 바깥 overflow-hidden + 안쪽 -ml-[18px]로
+  // 첫 조각/줄머리 조각의 점만 잘려 나간다 → 줄바꿈돼도 '·'로 시작하는 줄이 없다
+  const piece =
+    "relative whitespace-nowrap pl-[18px] before:absolute before:left-0 before:w-[18px] before:text-center before:text-gray-300 before:content-['·']";
 
   return (
     <article>
       {/* 행 전체가 탭 영역 — 모바일에서 제목만 노리게 하지 않는다.
-          누른 행의 태그·시각은 리더로 넘겨 어느 기사든 같은 알약을 보여 준다 */}
+          누른 행의 태그·시각은 리더로 넘겨 어느 기사든 같은 알약을 보여 준다.
+          포털(네이버·다음) 목록 문법 그대로 — 왼쪽 글, 오른쪽 큰 썸네일, 행마다 같은 모양 */}
       <Link
         href={readerHref(item.link)}
         onClick={() => stashReaderMeta(item, pillText)}
-        className="group -mx-2 flex items-start gap-2.5 rounded-xl px-2 py-3.5 active:bg-gray-100 sm:gap-5 sm:py-5"
+        className="group -mx-2 flex items-start gap-3 rounded-xl px-2 py-[18px] active:bg-gray-100 min-[375px]:gap-3.5 sm:gap-5 sm:py-5"
       >
-        <div className="min-w-0 flex-1 break-words">
+        {/* keep-all(전역)은 그대로 두고, 폭보다 긴 토큰(URL·영문 합성어)만 강제로 끊는다 */}
+        <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
           {/* 태그는 알약으로 — 회색 본문 속에서 이 기사가 어느 축인지 먼저 읽힌다 */}
           {pillText && (
-            <p className="mb-1.5">
+            <p className="mb-2 leading-none">
               <span className="pill-tag">{pillText}</span>
             </p>
           )}
 
-          <h2 className="text-[17px] font-bold leading-snug tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline sm:text-[20px]">
+          {/* 제목 최대 3줄 — 행 모양이 늘 비슷해야 20~40건을 훑기 쉽다.
+              썸네일이 있으면 글 칸이 190~210px로 좁아 keep-all(단어 단위)로는 한 줄에 한 단어만 남고
+              3줄 안에 제목이 다 안 들어온다 — 포털 목록처럼 글자 단위로 끊어 칸을 채운다 */}
+          <h2
+            className={`line-clamp-3 text-[17px] font-bold leading-[1.42] tracking-tight text-gray-900 decoration-[#FFB81C] decoration-2 underline-offset-2 group-hover:underline min-[375px]:text-[18px] sm:text-[20px] ${
+              item.imageUrl ? "[word-break:normal]" : ""
+            }`}
+          >
             {highlightParts(title, highlight)}
           </h2>
 
-          {/* 근거 칩 — 점수를 단독으로 표기하지 않는다. 담당자가 오판을 즉시 간파할 수 있어야 한다.
-              셋이면 충분하다 — 그 이상은 장식이 된다. */}
-          {item.reasons.length > 0 && (
-            <ul
-              aria-label="선정 근거"
-              className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1"
-            >
-              <li aria-hidden className="reason-label">
-                근거
-              </li>
-              {item.reasons.slice(0, 3).map((r) => (
-                <li key={`${r.kind}-${r.label}`} className="reason-chip">
-                  {r.label}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="mt-2 text-[12.5px] text-gray-500">
-            <span className="font-medium text-gray-600">
-              {item.sourceHost ?? hostOf(item.originallink)}
-            </span>
-            <span className="mx-1.5 text-gray-300">·</span>
-            <span>{formatRelative(item.pubDate)}</span>
+          {/* 출처 · 시각 (· N개 매체 보도) — 조각 단위로 통째로 줄바꿈되고 줄머리에 점이 남지 않는다 */}
+          <div className="mt-[9px] overflow-hidden text-[13px] leading-[1.45] text-gray-500">
+            <div className="-ml-[18px] flex flex-wrap">
+              <span className={`${piece} font-medium text-gray-600`}>
+                {item.sourceHost ?? hostOf(item.originallink)}
+              </span>
+              <span className={piece}>{formatRelative(item.pubDate)}</span>
+              {outlets && <span className={piece}>{outlets}</span>}
+            </div>
           </div>
         </div>
 
+        {/* 4:3 큰 썸네일 — 없으면 Thumbnail이 null을 돌려 본문이 전폭을 쓴다 */}
         <Thumbnail
           src={item.imageUrl}
-          className="h-[54px] w-[74px] shrink-0 rounded-lg sm:h-[84px] sm:w-[124px]"
+          className="h-[78px] w-[104px] shrink-0 rounded-xl min-[375px]:h-[84px] min-[375px]:w-[112px] sm:h-[96px] sm:w-[128px]"
         />
       </Link>
     </article>
