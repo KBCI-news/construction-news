@@ -42,11 +42,12 @@ export function FeedRow({
     <article>
       {/* 행 전체가 탭 영역 — 모바일에서 제목만 노리게 하지 않는다.
           누른 행의 태그·시각은 리더로 넘겨 어느 기사든 같은 알약을 보여 준다.
-          포털(네이버·다음) 목록 문법 그대로 — 왼쪽 글, 오른쪽 큰 썸네일, 행마다 같은 모양 */}
+          포털(네이버·다음) 목록 문법 그대로 — 왼쪽 글, 오른쪽 큰 썸네일, 행마다 같은 모양.
+          썸네일은 글 덩어리(알약·제목·시각)와 세로 중앙 정렬 — 위 맞춤이면 알약 옆에 붙어 위로 쏠려 보인다 */}
       <Link
         href={readerHref(item.link)}
         onClick={() => stashReaderMeta(item, pillText)}
-        className="group -mx-2 flex items-start gap-3 rounded-xl px-2 py-[18px] active:bg-gray-100 min-[375px]:gap-3.5 sm:gap-5 sm:py-5"
+        className="group -mx-2 flex items-center gap-3 rounded-xl px-2 py-[18px] active:bg-gray-100 min-[375px]:gap-3.5 sm:gap-5 sm:py-5"
       >
         {/* keep-all(전역)은 그대로 두고, 폭보다 긴 토큰(URL·영문 합성어)만 강제로 끊는다 */}
         <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
