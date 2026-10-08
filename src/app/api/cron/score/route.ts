@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { assignClusters } from "@/lib/cluster";
+import { stripHtml } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
 import { extractIndicators } from "@/lib/indicators";
 import { sourceTier } from "@/lib/lexicon";
@@ -19,9 +20,11 @@ const WINDOW_HOURS = 24 * 7;
 // 클러스터링되고 나머지가 전부 is_rep=true 로 남아 중복 노출됐다)
 const PAGE = 1000;
 
-// 클러스터링 대상: 피드에 노출될 수 있는 기사. O(n²) 비용을 묶는다.
-// (45로 두었더니 30점대 기사가 클러스터링에서 통째로 빠져 "박용갑 의원…추심
-//  중단" 같은 사안이 5건씩 나란히 노출됐다. 현재 7일 창의 30점 이상은 ~4.5천)
+// 클러스터링 대상: 태그가 붙은 기사 전부 + 그 밖의 상위 점수 기사.
+// 점수 30 이상만 묶던 때는 10점대 보도자료 전재(세종학당 후원 11건 등)가 전부
+// 대표로 남아 '전체' 태그에 줄줄이 노출됐고, 점수가 식어 집합에서 빠진 대표와
+// 남은 구성원이 따로 대표가 되는 일도 있었다. 뉴스 화면에 뜨는 건 태그 기사뿐이므로
+// 그 집합은 점수와 무관하게 늘 통째로 묶는다. (7일 창: 태그 ~1.5천, 30점 이상 ~4.6천)
 const CLUSTER_MIN_SCORE = 30;
 const CLUSTER_MAX_ROWS = 6000;
 
@@ -72,6 +75,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // dry=1 : 묶음·채점만 계산하고 저장하지 않는다 — 배포 뒤 묶음 품질 점검용
+  const dry = request.nextUrl.searchParams.get("dry") === "1";
+
   const supabase = getSupabaseAdmin();
   const since = new Date(Date.now() - WINDOW_HOURS * 3_600_000).toISOString();
 
@@ -100,10 +106,21 @@ export async function GET(request: NextRequest) {
 
   const payload = new Map<string, Record<string, unknown>>();
 
-  // ---- 1) 클러스터링 대상: 상위 점수 기사 ------------------------------------
-  let clusterRows: Row[] = [];
+  // ---- 1) 클러스터링 대상: 태그 기사 전부 + 상위 점수 기사 ---------------------
+  const clusterRows: Row[] = [];
   try {
-    clusterRows = await fetchPaged(
+    const tagged = await fetchPaged(
+      supabase,
+      () =>
+        supabase
+          .from("articles")
+          .select(SELECT)
+          .gte("pub_date", since)
+          .neq("desks", "{}")
+          .order("pub_date", { ascending: false }) as never,
+      CLUSTER_MAX_ROWS,
+    );
+    const top = await fetchPaged(
       supabase,
       () =>
         supabase
@@ -115,6 +132,12 @@ export async function GET(request: NextRequest) {
           .order("pub_date", { ascending: false }) as never,
       CLUSTER_MAX_ROWS,
     );
+    const seen = new Set<string>();
+    for (const r of [...tagged, ...top]) {
+      if (seen.has(r.link)) continue;
+      seen.add(r.link);
+      clusterRows.push(r);
+    }
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to read articles", detail: (err as Error).message },
@@ -238,6 +261,32 @@ export async function GET(request: NextRequest) {
   const retagLinks = new Set(retagRows.map((r) => r.link));
   const rows = Array.from(payload.values()).filter((r) => !retagLinks.has(r.link as string));
   const retagPayload = Array.from(payload.values()).filter((r) => retagLinks.has(r.link as string));
+
+  if (dry) {
+    const groups = new Map<string, { n: number; hosts: number; titles: string[] }>();
+    for (const r of rows) {
+      const id = r.cluster_id as string;
+      const g = groups.get(id) ?? { n: 0, hosts: r.cluster_hosts as number, titles: [] };
+      g.n += 1;
+      if (g.titles.length < 4) g.titles.push(stripHtml(r.title as string).slice(0, 50));
+      groups.set(id, g);
+    }
+    const sample = Array.from(groups.values())
+      .filter((g) => g.n >= 2)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 20);
+    return NextResponse.json({
+      ok: true,
+      dry: true,
+      windowHours: WINDOW_HOURS,
+      clusterCandidates: clusterRows.length,
+      clusters: groups.size,
+      multi: Array.from(groups.values()).filter((g) => g.n >= 2).length,
+      absorbed: rows.filter((r) => r.is_rep === false).length,
+      sample,
+    });
+  }
+
   let saved = 0;
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
