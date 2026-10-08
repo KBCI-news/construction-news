@@ -35,6 +35,8 @@ const NEIGHBOR_MAX_ROWS = 3000;
 const BACKLOG_SPAN_DAYS = 120;
 // 이 시각을 넘기면 창 밖 행 저장은 다음 회차로 미룬다(함수 상한 60초)
 const OLD_ROWS_DEADLINE_MS = 42_000;
+// 이 시각을 넘기면 어떤 행이든 저장을 멈추고 다음 회차로 미룬다 — 504 보다 낫다
+const HARD_DEADLINE_MS = 52_000;
 
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;
@@ -55,9 +57,11 @@ type Row = {
   cluster_id: string | null;
   cluster_hosts: number | null;
   is_rep: boolean | null;
+  matched_terms: string[] | null;
 };
 
-const SELECT = "link,title,description,pub_date,source_host,cluster_id,cluster_hosts,is_rep";
+const SELECT =
+  "link,title,description,pub_date,source_host,cluster_id,cluster_hosts,is_rep,matched_terms";
 
 async function fetchPaged(
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -213,12 +217,14 @@ export async function GET(request: NextRequest) {
   }
 
   if (clusterRows.length > 0) {
+    // 묶음 입력의 업권 term 은 지난 채점이 남긴 matched_terms 를 쓴다 — 행마다 사전을
+    // 다시 돌리면(1.5만 행 × 2회) 그것만으로 60초를 넘겼다. 채점은 저장할 행에만 한다.
     const prelim = clusterRows.map((r) => ({
       link: r.link,
       title: r.title,
       pubDate: r.pub_date,
       sourceHost: r.source_host,
-      matchedTerms: scoreOf(r).matchedTerms,
+      matchedTerms: r.matched_terms ?? [],
       description: r.description,
     }));
     const clustered = clusterArticles(prelim);
@@ -390,7 +396,11 @@ export async function GET(request: NextRequest) {
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
-    if (oldLinks.has(chunk[0].link as string) && Date.now() - startedAt > OLD_ROWS_DEADLINE_MS) {
+    const elapsed = Date.now() - startedAt;
+    if (
+      (oldLinks.has(chunk[0].link as string) && elapsed > OLD_ROWS_DEADLINE_MS) ||
+      elapsed > HARD_DEADLINE_MS
+    ) {
       deferred = rows.length - i;
       break;
     }
