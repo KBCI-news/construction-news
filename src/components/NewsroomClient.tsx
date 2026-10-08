@@ -32,7 +32,6 @@ type NewsTag = {
   q?: string;
   /** 같은 사건의 중복 기사(is_rep=false)도 받는다 — 언급이 드문 회사명 태그용 */
   dupes?: boolean;
-  hint?: string;
 };
 
 /** 주소에 태그가 없을 때 — 담당자 대부분의 첫 관심사가 추심이라 전체 대신 채권추심으로 연다 */
@@ -44,33 +43,28 @@ const TAGS: NewsTag[] = [
     id: "collection",
     label: "채권추심",
     desk: "collection",
-    hint: "추심 업무의 법·감독·제재와 실무 동향",
   },
   {
     id: "legal",
     label: "법/정책",
     legal: true,
-    hint: "회사와 관련된 법 개정·제재·판결 (개인채무자보호법·대부업법·노란봉투법, 대부업·불법추심 특사경 단속 포함)",
   },
   {
     id: "edoc",
     label: "전자문서",
     desk: "edoc",
-    hint: "문서 전자화·스캔·보관, 전자계약·전자결재",
   },
   {
     id: "survey",
     label: "임대차/권리조사",
     desk: "survey",
-    hint: "전세사기·보증금·등기·권리관계 조사",
   },
-  { id: "kbfg", label: "KB금융", desk: "own", hint: "KB금융그룹 관련 뉴스 전량" },
+  { id: "kbfg", label: "KB금융", desk: "own" },
   {
     id: "kbcard",
     label: "KB국민카드",
     desk: "own",
     q: "국민카드",
-    hint: "KB국민카드 관련 뉴스",
   },
   {
     // 데스크(own)를 걸지 않는다 — 데스크는 제목 근거로만 붙는데 회사명은 거의 본문에만 나와
@@ -80,13 +74,11 @@ const TAGS: NewsTag[] = [
     label: "KB신용정보",
     q: "KB신용정보",
     dupes: true,
-    hint: "제목·요약에 KB신용정보가 언급된 기사 전부 (최근 30일)",
   },
   {
     id: "peers",
     label: "신용정보업권",
     desk: "peers",
-    hint: "신한·우리·고려신용정보 등 채권추심 회사들의 동향",
   },
 ];
 
@@ -278,7 +270,6 @@ export default function NewsroomClient() {
   // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융).
   // 데스크 없는 검색어 태그(KB신용정보)는 전체 검색과 같아져 '전체'로 표기된다
   const scope = q && tag.q ? (TAGS.find((t) => t.desk === tag.desk && !t.q) ?? tag) : tag;
-  const hint = tag.hint;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -368,7 +359,6 @@ export default function NewsroomClient() {
                 );
               })}
             </ul>
-            {hint && <p className="mt-1.5 text-[13px] leading-snug text-gray-600">{hint}</p>}
           </div>
         </div>
 
