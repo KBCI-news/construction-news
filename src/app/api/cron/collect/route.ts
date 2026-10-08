@@ -3,7 +3,7 @@ import { POLL_MINUTES, QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
-import { isKeepTerm, keepMatches } from "@/lib/archive";
+import { isKeepTerm, keepMatches, naverQueryOf } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
   const failures: { keyword: string; status: number }[] = [];
 
   const fetchWithRetry = async (keyword: string): Promise<NaverNewsItem[]> => {
-    const url = `${NAVER_ENDPOINT}?query=${encodeURIComponent(keyword)}&display=${PER_KEYWORD}&sort=date`;
+    const url = `${NAVER_ENDPOINT}?query=${encodeURIComponent(naverQueryOf(keyword))}&display=${PER_KEYWORD}&sort=date`;
     for (let attempt = 0; attempt < 3; attempt++) {
       const response = await fetch(url, {
         headers: {
