@@ -43,7 +43,7 @@ const RANGE_HOURS: Record<string, number | null> = {
 
 const SELECT =
   "link,original_link,title,description,pub_date,image_url,source_host," +
-  "importance,importance_tier,urgent,desks,kinds,reasons,cluster_hosts,is_rep,matched_terms";
+  "importance,importance_tier,urgent,desks,kinds,reasons,cluster_id,cluster_hosts,is_rep,matched_terms";
 
 type Row = Pick<
   ArticleRow,
@@ -55,6 +55,7 @@ type Row = Pick<
   desks: string[] | null;
   kinds: string[] | null;
   reasons: ReasonTag[] | null;
+  cluster_id: string | null;
   cluster_hosts: number | null;
   is_rep: boolean | null;
   matched_terms: string[] | null;
@@ -200,7 +201,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const rows = (data ?? []) as unknown as Row[];
+  let rows = (data ?? []) as unknown as Row[];
+  // dupes=1 : 대표가 아닌 구성원도 받되 같은 사안은 하나만 — 회사명 태그(KB신용정보)는
+  // 대표 제목에 회사명이 없어도 구성원이 언급하면 그 사안을 보여 줘야 하지만,
+  // 전재 기사 열 건이 줄줄이 나오면 안 된다. 대표가 있으면 대표, 없으면 가장 새 기사.
+  if (includeDupes) {
+    const byCluster = new Map<string, Row>();
+    for (const r of rows) {
+      const key = r.cluster_id ?? r.link;
+      const cur = byCluster.get(key);
+      if (!cur || (r.is_rep && !cur.is_rep)) byCluster.set(key, r);
+    }
+    rows = rows.filter((r) => byCluster.get(r.cluster_id ?? r.link) === r);
+  }
   let items = rows.map(toItem);
   const unscored = items.length > 0 && items.every((it) => it.importance === null);
 

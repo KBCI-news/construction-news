@@ -27,6 +27,8 @@ const PAGE = 1000;
 // 그 집합은 점수와 무관하게 늘 통째로 묶는다. (7일 창: 태그 ~1.5천, 30점 이상 ~4.6천)
 const CLUSTER_MIN_SCORE = 30;
 const CLUSTER_MAX_ROWS = 6000;
+// 창 밖 미묶음(소급 수집) 기사 — 회차당 이만큼씩 묶어 나간다
+const BACKLOG_MAX_ROWS = 4000;
 
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;
@@ -109,6 +111,7 @@ export async function GET(request: NextRequest) {
   // ---- 1) 클러스터링 대상: 태그 기사 전부 + 상위 점수 기사 ---------------------
   const clusterRows: Row[] = [];
   let clusterSummaries: ClusterSummary[] = [];
+  let backlogCount = 0;
   try {
     const tagged = await fetchPaged(
       supabase,
@@ -133,12 +136,28 @@ export async function GET(request: NextRequest) {
           .order("pub_date", { ascending: false }) as never,
       CLUSTER_MAX_ROWS,
     );
+    // (c) 창 밖인데 한 번도 묶이지 않은 태그·보관 기사 — 소급 수집으로 들어온 과거 기사.
+    //     같은 날 들어온 전재 기사끼리 묶는다(그 날 기사가 통째로 새로 들어오므로 충분하다).
+    //     회차당 상한을 두고 다음 회차가 이어 받는다.
+    const backlog = await fetchPaged(
+      supabase,
+      () =>
+        supabase
+          .from("articles")
+          .select(SELECT)
+          .lt("pub_date", since)
+          .is("cluster_id", null)
+          .or("desks.neq.{},keep.eq.true")
+          .order("pub_date", { ascending: false }) as never,
+      BACKLOG_MAX_ROWS,
+    );
     const seen = new Set<string>();
-    for (const r of [...tagged, ...top]) {
+    for (const r of [...tagged, ...top, ...backlog]) {
       if (seen.has(r.link)) continue;
       seen.add(r.link);
       clusterRows.push(r);
     }
+    backlogCount = backlog.length;
   } catch (err) {
     return NextResponse.json(
       { error: "Failed to read articles", detail: (err as Error).message },
@@ -294,6 +313,7 @@ export async function GET(request: NextRequest) {
       dry: true,
       windowHours: WINDOW_HOURS,
       clusterCandidates: clusterRows.length,
+      backlog: backlogCount,
       clusters: groups.size,
       multi: Array.from(groups.values()).filter((g) => g.n >= 2).length,
       absorbed: rows.filter((r) => r.is_rep === false).length,
@@ -411,6 +431,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     windowHours: WINDOW_HOURS,
     clusterCandidates: clusterRows.length,
+    backlog: backlogCount,
     backfilled: unscored.length,
     saved,
     retagged,
