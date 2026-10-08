@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { ExternalBrowserEscape } from "@/components/ExternalBrowserEscape";
 
 export const metadata: Metadata = {
   title: { default: "KBCI 뉴스룸", template: "%s | KBCI 뉴스룸" },
@@ -30,6 +31,7 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           본문 바로가기
         </a>
+        <ExternalBrowserEscape />
         <Suspense fallback={null}>
           <Header />
         </Suspense>

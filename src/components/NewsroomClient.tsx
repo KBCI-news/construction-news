@@ -24,7 +24,7 @@ const RANGE_KEYS = Object.keys(RANGE_LABEL) as RangeKey[];
  * 화면 제목도 이 라벨을 그대로 쓴다.
  */
 type NewsTag = {
-  id: string; // URL의 tag= 값. 빈 문자열 = 전체
+  id: string; // URL의 tag= 값. "all" = 전체(태그 합집합)
   label: string;
   desk?: string;
   legal?: boolean;
@@ -33,12 +33,11 @@ type NewsTag = {
   hint?: string;
 };
 
+/** 주소에 태그가 없을 때 — 담당자 대부분의 첫 관심사가 추심이라 전체 대신 채권추심으로 연다 */
+const DEFAULT_TAG = "collection";
+
 const TAGS: NewsTag[] = [
-  {
-    id: "",
-    label: "전체",
-    hint: "태그가 붙은 기사를 모두 모았습니다 · 태그 밖 기사는 검색으로 찾으세요",
-  },
+  { id: "all", label: "전체" },
   {
     id: "collection",
     label: "채권추심",
@@ -72,6 +71,13 @@ const TAGS: NewsTag[] = [
     hint: "KB국민카드 관련 뉴스",
   },
   {
+    id: "kbci",
+    label: "KB신용정보",
+    desk: "own",
+    q: "KB신용정보",
+    hint: "KB신용정보 관련 뉴스",
+  },
+  {
     id: "peers",
     label: "신용정보업권",
     desk: "peers",
@@ -91,7 +97,7 @@ const LEGACY_TAG: Record<string, string> = {
 function legacyTagOf(params: { get(name: string): string | null }): string | undefined {
   const id = params.get("legal") === "1" ? "legal" : LEGACY_TAG[params.get("desk") ?? ""];
   // desk=constructor 같은 값이 객체 기본 속성을 집어 오지 않게 실제 태그 id만 받는다
-  return TAGS.some((t) => t.id && t.id === id) ? id : undefined;
+  return TAGS.some((t) => t.id === id) ? id : undefined;
 }
 
 const PAGE = 30;
@@ -111,8 +117,8 @@ export default function NewsroomClient() {
 
   const q = params.get("q") ?? "";
   // 옛 북마크는 주소를 바꾸기 전 첫 화면부터 옮겨 갈 태그로 그린다 — 전체 목록이 한 번 번쩍이지 않게
-  const tagId = params.get("tag") || legacyTagOf(params) || "";
-  const tag = TAGS.find((t) => t.id === tagId) ?? TAGS[0];
+  const tagId = params.get("tag") || legacyTagOf(params) || DEFAULT_TAG;
+  const tag = TAGS.find((t) => t.id === tagId) ?? TAGS.find((t) => t.id === DEFAULT_TAG)!;
   const rangeParam = params.get("range") as RangeKey;
   // 모르는 값은 API도 전체로 처리한다 — 요약 줄이 빈 라벨을 보이지 않게 여기서 맞춘다
   const range: RangeKey = RANGE_KEYS.includes(rangeParam) ? rangeParam : "all";
@@ -168,7 +174,7 @@ export default function NewsroomClient() {
       // 법/정책은 "우리와 관련된" 법 개정·제재·판결만 — 데스크 소속을 요구해
       // 무관한 일반 법조 기사(하도급 과징금, 헌재 각하 등)를 거른다
       sp.set("scope", "curated");
-    } else if (!tag.desk && !q) {
+    } else if (tag.id === "all" && !q) {
       // 전체 = 아래 태그들의 합집합. 태그 체계 밖(정보보호·부실채권 등)만 걸린
       // 기사와 태그 없는 일반 뉴스는 검색으로만 닿는다
       sp.set("scope", "tagged");
@@ -248,8 +254,8 @@ export default function NewsroomClient() {
   // 전체(scope=tagged)와 관련도 검색은 API가 후보를 넉넉히 받은 뒤 한 번 더 거른다(route.ts fetchLimit) —
   // LIMIT건보다 적게 와도 뒤에 더 있을 수 있어 '마지막 기사'라고 단정하지 않는다
   const postFiltered =
-    (!tag.desk && !tag.legal && !q) || (sort === "relevance" && Boolean(q || tag.q));
-  const narrowed = Boolean(tag.id) || range !== "all";
+    (tag.id === "all" && !q) || (sort === "relevance" && Boolean(q || tag.q));
+  const narrowed = tag.id !== "all" || range !== "all";
   const sortLabel =
     sort === "score" ? "중요도순" : sort === "relevance" ? "관련도순" : "최신순";
 
@@ -257,8 +263,7 @@ export default function NewsroomClient() {
   const heading = q ? `“${q}” 검색 결과` : tag.label;
   // 사용자 검색어는 태그의 내장 검색어(국민카드)를 대신한다 — 그때 실제 범위는 같은 데스크의 상위 태그(KB금융)
   const scope = q && tag.q ? (TAGS.find((t) => t.desk === tag.desk && !t.q) ?? tag) : tag;
-  // 전체 태그의 검색은 scope=tagged 없이 조회해 태그 없는 기사도 나온다 — '태그 붙은 기사만' 안내를 그대로 두면 틀린 말이 된다
-  const hint = q && !tag.id ? "태그와 관계없이 검색합니다 · 태그 밖 기사도 함께 찾습니다" : tag.hint;
+  const hint = tag.hint;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -335,10 +340,10 @@ export default function NewsroomClient() {
               {TAGS.map((t) => {
                 const active = tag.id === t.id;
                 return (
-                  <li key={t.id || "all"} className="shrink-0">
+                  <li key={t.id} className="shrink-0">
                     <button
                       type="button"
-                      onClick={() => setParam({ tag: t.id || null })}
+                      onClick={() => setParam({ tag: t.id })}
                       aria-pressed={active}
                       className={`chip ${active ? "chip-on" : ""}`}
                     >
@@ -423,12 +428,12 @@ export default function NewsroomClient() {
                         : "최신순"
                   }`}
           </p>
-          {q && scope.id && (
+          {q && scope.id !== "all" && (
             <p className="w-full text-[13px] text-gray-600">
               {scope.label} 태그 안에서 찾은 결과 ·{" "}
               <button
                 type="button"
-                onClick={() => setParam({ tag: null })}
+                onClick={() => setParam({ tag: "all" })}
                 className="inline-flex min-h-[40px] items-center font-bold text-[#7A5E08] underline underline-offset-2"
               >
                 전체에서 찾기
@@ -478,7 +483,7 @@ export default function NewsroomClient() {
               {narrowed && (
                 <button
                   type="button"
-                  onClick={() => setParam({ tag: null, range: null })}
+                  onClick={() => setParam({ tag: "all", range: null })}
                   className="btn-soft"
                 >
                   전체 기간 · 전체 태그로 보기
@@ -496,7 +501,7 @@ export default function NewsroomClient() {
                 <FeedRow
                   key={item.link}
                   item={item}
-                  pill={scope.id ? scope.label : undefined}
+                  pill={scope.id !== "all" ? scope.label : undefined}
                   highlight={q || undefined}
                 />
               ))}
