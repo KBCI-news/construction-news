@@ -32,7 +32,8 @@ export type FeedResponse = {
   unscored: boolean;
 };
 
-// "all"은 보관 중인 아카이브 전체(30일 보존) — 기간 필터를 걸지 않는다
+// "all"은 보관 중인 아카이브 전체 — 기간 필터를 걸지 않는다
+// (보존: 태그 없는 일반 기사 30일, 태그 기사 1년, KB신용정보 수집분 5년 — purge_old_articles)
 const RANGE_HOURS: Record<string, number | null> = {
   "24h": 24,
   "7d": 24 * 7,
@@ -93,9 +94,14 @@ export async function GET(request: NextRequest) {
   const rangeKey = p.get("range") ?? "all";
   const range = rangeKey in RANGE_HOURS ? RANGE_HOURS[rangeKey] : null;
   const q = (p.get("q") ?? "").trim();
+  // qt = 수집 검색어. 네이버 요약에 검색어가 안 보이는 기사가 많아 제목·요약 검색만으로는
+  // "KB신용정보"로 가져온 기사 대부분을 놓쳤다 — 수집 검색어(query_terms)로도 찾는다
+  const qt = (p.get("qt") ?? "").replace(/[%,(){}]/g, " ").trim();
   const sortParam = p.get("sort");
   const minScore = Number(p.get("minScore") ?? "");
   const limit = Math.min(Math.max(Number(p.get("limit") ?? 60), 1), 200);
+  // 목록 끝에서 이어 받기 — 최신순처럼 서버 정렬을 그대로 쓰는 조회에서만 의미가 있다
+  const offset = Math.max(0, Math.floor(Number(p.get("offset") ?? 0) || 0));
   const includeDupes = p.get("dupes") === "1";
 
   let supabase;
@@ -116,7 +122,20 @@ export async function GET(request: NextRequest) {
 
   if (desk) query = query.contains("desks", [desk]);
   if (scope === "general") query = query.eq("desks", "{}");
-  else if (scope === "curated" || scope === "tagged") query = query.neq("desks", "{}");
+  else if (scope === "curated") query = query.neq("desks", "{}");
+  // scope=tagged : 뉴스 화면의 태그 중 하나에라도 속하는 기사만 ("전체" 태그).
+  // 태그 체계에 없는 데스크(정보보호·부실채권·대출 등)만 걸린 기사는 뺀다.
+  // (서버에서 다시 거르던 것을 SQL 로 옮겨 offset 이어 받기가 정확히 맞물린다)
+  else if (scope === "tagged") {
+    query = query.or(
+      `desks.ov.{${TAG_DESKS.join(",")}},kinds.ov.{${(LEGAL_KINDS as string[]).join(",")}}`,
+    );
+  }
+  if (qt) {
+    query = query.or(
+      `query_terms.cs.{${qt}},title.ilike.%${qt}%,description.ilike.%${qt}%`,
+    );
+  }
   if (kinds.length) query = query.overlaps("kinds", kinds);
   if (!Number.isNaN(minScore) && p.get("minScore")) {
     query = query.gte("importance", minScore);
@@ -141,14 +160,8 @@ export async function GET(request: NextRequest) {
       .order("pub_date", { ascending: false });
   }
 
-  // tagged는 서버에서 한 번 더 거르므로 넉넉히 받아 둔다
-  const fetchLimit =
-    sort === "relevance"
-      ? Math.min(limit * 4, 400)
-      : scope === "tagged"
-        ? Math.min(limit * 2, 400)
-        : limit;
-  const { data, error } = await query.limit(fetchLimit);
+  const fetchLimit = sort === "relevance" ? Math.min(limit * 4, 400) : limit;
+  const { data, error } = await query.range(offset, offset + fetchLimit - 1);
 
   // 큐레이션 마이그레이션(0004)이 아직 적용되지 않은 환경에서도 사이트가 죽지 않게
   // 기본 컬럼만으로 재조회한다. 등급·근거는 UI에서 자동으로 감춰진다.
@@ -189,15 +202,6 @@ export async function GET(request: NextRequest) {
 
   const rows = (data ?? []) as unknown as Row[];
   let items = rows.map(toItem);
-  // scope=tagged : 뉴스 화면의 태그 중 하나에라도 속하는 기사만 ("전체" 태그).
-  // 태그 체계에 없는 데스크(정보보호·부실채권·대출 등)만 걸린 기사는 뺀다.
-  if (scope === "tagged") {
-    items = items.filter(
-      (it) =>
-        it.desks.some((d) => TAG_DESKS.includes(d)) ||
-        it.kinds.some((k) => (LEGAL_KINDS as string[]).includes(k)),
-    );
-  }
   const unscored = items.length > 0 && items.every((it) => it.importance === null);
 
   if (sort === "relevance" && q) {

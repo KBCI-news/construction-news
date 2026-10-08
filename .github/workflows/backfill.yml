@@ -1,0 +1,66 @@
+name: Backfill archive
+
+# 과거 기사 소급 수집 — /api/cron/backfill 을 검색어 몇 개씩 끝까지 돌린다.
+# 네이버 뉴스 검색은 검색어당 최대 1,000건이라 흔한 검색어는 며칠치, 드문 검색어는
+# 몇 년치가 들어온다. 보존은 태그 기사 1년, KB신용정보 수집분 5년.
+on:
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: "검색어당 페이지 수 (100건씩, 최대 10)"
+        required: false
+        default: "10"
+        type: string
+      from:
+        description: "시작 검색어 인덱스"
+        required: false
+        default: "0"
+        type: string
+      term:
+        description: "검색어 하나만 (비우면 전체)"
+        required: false
+        default: ""
+        type: string
+      sort:
+        description: "date 또는 sim (sim 은 다른 1,000건을 내준다)"
+        required: false
+        default: "date"
+        type: string
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Run backfill
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PAGES: ${{ inputs.pages }}
+          FROM: ${{ inputs.from }}
+          TERM: ${{ inputs.term }}
+          SORT: ${{ inputs.sort }}
+        run: |
+          set -euo pipefail
+          call() {
+            curl -fsS --max-time 90 -H "Authorization: Bearer ${CRON_SECRET}" "${CRON_URL}/api/cron/backfill?$1"
+          }
+          if [ -n "${TERM}" ]; then
+            enc=$(printf '%s' "${TERM}" | jq -sRr @uri)
+            call "term=${enc}&pages=${PAGES}&sort=${SORT}" | jq -c '{upserted, terms}'
+            exit 0
+          fi
+          offset="${FROM}"
+          while :; do
+            out=$(call "offset=${offset}&count=6&pages=${PAGES}&sort=${SORT}")
+            echo "$out" | jq -c '{offset, total, upserted, elapsedMs, terms: [.terms[] | {term, pages, fetched, kept, oldest: (.oldest // "" | .[0:10]), status}]}'
+            # 시간에 걸려 일부만 처리된 검색어가 있으면 같은 offset 을 한 번 더
+            partial=$(echo "$out" | jq -r '[.terms[] | select(.status == "partial")] | length')
+            next=$(echo "$out" | jq -r '.next')
+            if [ "$partial" != "0" ] && [ "${retried:-}" != "$offset" ]; then
+              retried="$offset"; sleep 3; continue
+            fi
+            [ "$next" = "null" ] && break
+            offset="$next"
+            sleep 2
+          done

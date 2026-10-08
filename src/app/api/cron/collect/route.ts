@@ -3,6 +3,7 @@ import { POLL_MINUTES, QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
+import { isKeepTerm } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,10 @@ type ArticleUpsert = {
   reasons: unknown;
   importance_parts: unknown;
   scored_at: string;
+  /** 이 기사를 가져온 검색어 — DB 트리거가 기존 값과 합친다 */
+  query_terms: string[];
+  /** 5년 보관 검색어(KB신용정보)로 수집됐으면 true — 트리거가 OR 로 유지한다 */
+  keep: boolean;
 };
 
 function unauthorized() {
@@ -114,10 +119,19 @@ export async function GET(request: NextRequest) {
   const BATCH_SIZE = 5;
   const BATCH_DELAY_MS = 800;
   const collected: NaverNewsItem[] = [];
+  // 기사마다 어느 검색어가 가져왔는지 — 보관함 태그(KB신용정보)는 제목·요약이 아니라 이걸로 찾는다
+  const termsByLink = new Map<string, Set<string>>();
   for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
     const batch = tasks.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(batch.map((t) => fetchWithRetry(t.term)));
-    batchResults.forEach((items) => collected.push(...items));
+    batchResults.forEach((items, j) => {
+      collected.push(...items);
+      for (const it of items) {
+        const set = termsByLink.get(it.link) ?? new Set<string>();
+        set.add(batch[j].term);
+        termsByLink.set(it.link, set);
+      }
+    });
     if (i + BATCH_SIZE < tasks.length) {
       await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
     }
@@ -152,6 +166,8 @@ export async function GET(request: NextRequest) {
       reasons: res.reasons,
       importance_parts: res.parts,
       scored_at: new Date(nowMs).toISOString(),
+      query_terms: Array.from(termsByLink.get(item.link) ?? []),
+      keep: Array.from(termsByLink.get(item.link) ?? []).some(isKeepTerm),
     });
   }
 
