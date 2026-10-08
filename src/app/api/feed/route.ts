@@ -33,7 +33,7 @@ export type FeedResponse = {
 };
 
 // "all"은 보관 중인 아카이브 전체 — 기간 필터를 걸지 않는다
-// (보존: 태그 없는 일반 기사 30일, 태그 기사 1년, KB신용정보 수집분 5년 — purge_old_articles)
+// (보존: 태그 없는 일반 기사 30일, 태그 기사 3년, KB신용정보 수집분 5년 — purge_old_articles)
 const RANGE_HOURS: Record<string, number | null> = {
   "24h": 24,
   "7d": 24 * 7,
