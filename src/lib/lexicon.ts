@@ -367,6 +367,18 @@ export const TERMS: Term[] = [
   t("부동산 경매", 1, "survey"),
   t("공매", 1, "survey"),
   t("배당요구", 1, "survey"),
+  // 권리조사 업계·상품 — 리파인은 흔한 외래어라 부동산·임대차 문맥이 있을 때만 인정
+  {
+    term: "리파인",
+    tier: 1,
+    desk: "survey",
+    query: true,
+    requires: ["권리조사", "임대차", "전세", "부동산", "보증금", "임차", "권원", "등기"],
+  },
+  t("바이릿지", 1, "survey", true),
+  t("부동산 권리보험", 1, "survey", true),
+  t("부동산 권원보험", 1, "survey", true),
+  t("권원보험", 1, "survey"),
 
   // --- lending : 대출·여신 (추심 물량의 선행지표) ---
   t("가계대출", 1, "lending", true),
@@ -398,6 +410,7 @@ export const TERMS: Term[] = [
   t("공인전자문서센터", 0, "edoc", true),
   t("전자문서법", 0, "edoc", true),
   t("전자문서", 1, "edoc", true),
+  t("전자증명", 1, "edoc", true),
   t("전자금융거래법", 1, "edoc", true),
   t("전자금융감독규정", 1, "edoc", true),
   t("전자서명", 1, "edoc", true),
