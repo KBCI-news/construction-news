@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { FeedItem } from "@/app/api/feed/route";
 import { tagLabelOf } from "@/lib/lexicon";
-import { formatRelative, hostOf, stripHtml } from "@/lib/format";
+import { formatRelative, stripHtml } from "@/lib/format";
 import { readerHref, stashReaderMeta } from "@/lib/links";
 import { Thumbnail } from "@/components/Thumbnail";
 
@@ -37,12 +37,6 @@ export function FeedRow({
   // 법/정책을 골랐는데 기사 원소속(채권추심 등)이 뜨면 필터가 어긋난 것처럼 읽힌다.
   // 그 밖에는 태그 목록과 같은 이름으로만 표기한다.
   const pillText = pill ?? tagLabelOf(item);
-  // 여러 매체가 다룬 기사만 — 점수 없이 "큰 기사"임을 알리는 유일한 단서
-  const outlets = item.clusterHosts >= 3 ? `${item.clusterHosts}개 매체 보도` : null;
-  // 메타 조각: 앞에 '·'를 ::before로 그리고, 바깥 overflow-hidden + 안쪽 -ml-[18px]로
-  // 첫 조각/줄머리 조각의 점만 잘려 나간다 → 줄바꿈돼도 '·'로 시작하는 줄이 없다
-  const piece =
-    "relative whitespace-nowrap pl-[18px] before:absolute before:left-0 before:w-[18px] before:text-center before:text-gray-300 before:content-['·']";
 
   return (
     <article>
@@ -74,16 +68,10 @@ export function FeedRow({
             {highlightParts(title, highlight)}
           </h2>
 
-          {/* 출처 · 시각 (· N개 매체 보도) — 조각 단위로 통째로 줄바꿈되고 줄머리에 점이 남지 않는다 */}
-          <div className="mt-[9px] overflow-hidden text-[13px] leading-[1.45] text-gray-500">
-            <div className="-ml-[18px] flex flex-wrap">
-              <span className={`${piece} font-medium text-gray-600`}>
-                {item.sourceHost ?? hostOf(item.originallink)}
-              </span>
-              <span className={piece}>{formatRelative(item.pubDate)}</span>
-              {outlets && <span className={piece}>{outlets}</span>}
-            </div>
-          </div>
+          {/* 시각만 — 매체명·"N개 매체 보도"는 목록에서 뺐다(출처는 리더 화면에서 본다) */}
+          <p className="mt-[9px] text-[13px] leading-[1.45] text-gray-500">
+            {formatRelative(item.pubDate)}
+          </p>
         </div>
 
         {/* 4:3 큰 썸네일 — 없으면 Thumbnail이 null을 돌려 본문이 전폭을 쓴다 */}
