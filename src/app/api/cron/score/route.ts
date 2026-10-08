@@ -28,8 +28,10 @@ const PAGE = 1000;
 const CLUSTER_MIN_SCORE = 30;
 const CLUSTER_MAX_ROWS = 6000;
 // 창 밖 미묶음(소급 수집) 기사 — 회차당 최신 쪽부터 이 날짜 폭만큼, 최대 이 건수
-const BACKLOG_MAX_ROWS = 4000;
-const BACKLOG_SPAN_DAYS = 30;
+// (소급 수집 직후 미묶음 1.1만 건을 30일 폭으로는 36회차가 걸렸다 — 한 회차 8천 행도
+//  조회·묶음·저장에 10초 안팎이라 폭을 넓혀 서너 회차에 끝낸다)
+const BACKLOG_MAX_ROWS = 6000;
+const BACKLOG_SPAN_DAYS = 120;
 
 // 아직 점수가 없는 기사에 기본 점수를 부여하는 상한
 const BACKFILL_MAX_ROWS = 3000;
