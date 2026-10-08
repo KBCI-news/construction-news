@@ -10,6 +10,7 @@ import {
   normalizeBid,
   parseKst,
   probeG2b,
+  searchBids,
 } from "@/lib/g2b";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ const MAX_WINDOW_HOURS = 24 * 30;
 //   ?misses=50        걸리지 않은 공고명 표본 — 사전에 뭘 더 넣을지 정할 때
 //   ?clsfc=1          조달청 분류명 빈도표 — 어느 분류를 사전에 넣을지 고를 때
 //   ?divs=용역,물품   업무구분 지정
+//   ?search=추심&agency=한국자산관리공사&months=12
+//                     공고명·수요기관으로 과거 공고 검색 (기관이 그 사업을 낸 적이 있는지)
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -74,6 +77,71 @@ export async function GET(request: NextRequest) {
   }
 
   const divs = parseDivs(p.get("divs"));
+
+  // 공고명·수요기관 검색 — 서버가 걸러 주므로 몇 달치를 한 번에 본다.
+  // 검색창은 1개월씩만 받아 주므로 30일 단위로 거슬러 돈다.
+  const search = p.get("search")?.trim();
+  const agency = p.get("agency")?.trim();
+  if (search || agency) {
+    const started = Date.now();
+    const months = clamp(Number(p.get("months") ?? 12), 1, 36);
+    const seen = new Map<string, ReturnType<typeof normalizeBid>>();
+    const errors: string[] = [];
+    let windows = 0;
+    let truncatedWindows = 0;
+    outer: for (const div of divs) {
+      for (let i = 0; i < months; i++) {
+        if (Date.now() - started > 50_000) {
+          errors.push(`시간 예산 초과 — ${div} ${i}개월까지만 봤습니다`);
+          break outer;
+        }
+        const wTo = new Date(to.getTime() - i * 30 * 86_400_000);
+        const wFrom = new Date(wTo.getTime() - 30 * 86_400_000 + 60_000);
+        const r = await searchBids({
+          workDiv: div,
+          from: wFrom,
+          to: wTo,
+          keyword: search || undefined,
+          agency: agency || undefined,
+        });
+        windows += 1;
+        if (!r.ok) {
+          errors.push(`${div} ${wFrom.toISOString().slice(0, 10)}~: ${r.error ?? "조회 실패"}`);
+          continue;
+        }
+        if (r.truncated) truncatedWindows += 1;
+        for (const raw of r.rows) {
+          const bid = normalizeBid(raw, div);
+          if (bid && !seen.has(bid.bidKey)) seen.set(bid.bidKey, bid);
+        }
+      }
+    }
+    const items = Array.from(seen.values())
+      .filter((b): b is NonNullable<typeof b> => Boolean(b))
+      .sort((a, b) => (b.noticeDt ?? "").localeCompare(a.noticeDt ?? ""))
+      .map((b) => ({
+        title: b.title,
+        demandAgency: b.demandAgency,
+        noticeAgency: b.noticeAgency,
+        noticeDt: b.noticeDt,
+        closeDt: b.closeDt,
+        presmptPrice: b.presmptPrice,
+        budgetAmount: b.budgetAmount,
+        match: matchBid({ title: b.title }).areas,
+        url: b.detailUrl,
+      }));
+    return NextResponse.json({
+      ok: true,
+      search: search ?? null,
+      agency: agency ?? null,
+      months,
+      windows,
+      truncatedWindows,
+      total: items.length,
+      items,
+      errors,
+    });
+  }
 
   if (p.get("probe")) {
     return NextResponse.json({
