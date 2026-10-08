@@ -6,7 +6,17 @@ export const KEEP_TERMS = new Set(["KB신용정보"]);
 export const KEEP_YEARS = 5;
 export const TAGGED_RETENTION_DAYS = 365;
 
-export const isKeepTerm = (term: string): boolean => KEEP_TERMS.has(term);
+/** 따옴표·공백을 벗긴 검색어 — `"KB신용정보"` 로 보낸 정확검색도 같은 보관 검색어다 */
+const bareTerm = (term: string): string => term.replace(/["\s]/g, "");
+export const isKeepTerm = (term: string): boolean => KEEP_TERMS.has(bareTerm(term));
+
+/**
+ * 네이버에 보낼 검색어. 보관 검색어는 따옴표로 감싼 정확검색으로 보낸다 —
+ * 맨 "KB신용정보"는 KB + 신용정보로 느슨하게 맞아 1,000건이 7주치 무관 기사였고,
+ * "\"KB신용정보\"" 는 300건으로 15개월을 거슬러 올라갔다(2025-06까지).
+ */
+export const naverQueryOf = (term: string): string =>
+  isKeepTerm(term) && !term.startsWith('"') ? `"${bareTerm(term)}"` : term;
 
 // 네이버 검색은 "KB신용정보"를 느슨하게 맞춘다(KB + 신용정보) — 1,000건이 7주치였고
 // 대부분 무관한 기사였다. 제목·요약에 회사명이 실제로 있는 기사만 보관한다.

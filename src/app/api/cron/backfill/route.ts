@@ -3,7 +3,7 @@ import { QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
-import { isKeepTerm, keepMatches, retentionCutoff } from "@/lib/archive";
+import { isKeepTerm, keepMatches, naverQueryOf, retentionCutoff } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
   const fetchPage = async (term: string, page: number): Promise<NaverNewsItem[] | null> => {
     const start = (page - 1) * PER_PAGE + 1;
-    const url = `${NAVER_ENDPOINT}?query=${encodeURIComponent(term)}&display=${PER_PAGE}&start=${start}&sort=${sort}`;
+    const url = `${NAVER_ENDPOINT}?query=${encodeURIComponent(naverQueryOf(term))}&display=${PER_PAGE}&start=${start}&sort=${sort}`;
     for (let attempt = 0; attempt < 3; attempt++) {
       const res = await fetch(url, {
         headers: { "X-Naver-Client-Id": clientId, "X-Naver-Client-Secret": clientSecret },
