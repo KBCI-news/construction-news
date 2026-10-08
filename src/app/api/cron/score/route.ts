@@ -30,8 +30,10 @@ const CLUSTER_MAX_ROWS = 6000;
 // 창 밖 미묶음(소급 수집) 기사 — 회차당 최신 쪽부터 이 날짜 폭만큼, 최대 이 건수
 // 창 밖 행은 묶음 결과가 바뀐 것만 저장하므로 회차 비용은 바뀐 건수에 비례한다.
 // (창 4.9천 + 창 밖 1.1만을 전부 저장했더니 60초를 넘겨 504 — 정규 크론까지 멈췄다)
-const BACKLOG_MAX_ROWS = 3000;
+const BACKLOG_MAX_ROWS = 4000;
 const NEIGHBOR_MAX_ROWS = 3000;
+// 창 안 상위 점수(태그 없는) 기사 — 검색 결과 중복 접기용이라 가장 높은 쪽만
+const TOP_MAX_ROWS = 3000;
 const BACKLOG_SPAN_DAYS = 120;
 // 이 시각을 넘기면 창 밖 행 저장은 다음 회차로 미룬다(함수 상한 60초)
 const OLD_ROWS_DEADLINE_MS = 42_000;
@@ -125,6 +127,8 @@ export async function GET(request: NextRequest) {
     });
 
   const payload = new Map<string, Record<string, unknown>>();
+  // 창 밖 행의 묶음 열만 담는 별도 묶음 — 열 구성이 달라 따로 upsert 한다
+  const oldPayload: Record<string, unknown>[] = [];
 
   // ---- 1) 클러스터링 대상: 태그 기사 전부 + 상위 점수 기사 ---------------------
   const clusterRows: Row[] = [];
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
           .gte("importance", CLUSTER_MIN_SCORE)
           .order("importance", { ascending: false })
           .order("pub_date", { ascending: false }) as never,
-      CLUSTER_MAX_ROWS,
+      TOP_MAX_ROWS,
     );
     // (c) 창 밖인데 한 번도 묶이지 않은 태그·보관 기사 — 소급 수집으로 들어온 과거 기사.
     //     최신 쪽부터 최대 BACKLOG_SPAN_DAYS 치를 집어 그 날짜 구간의 이미 묶인 이웃
@@ -243,8 +247,21 @@ export async function GET(request: NextRequest) {
         (c?.clusterId ?? r.link) === r.cluster_id &&
         (c?.isRep ?? true) === r.is_rep &&
         (c?.clusterHosts ?? 1) === (r.cluster_hosts ?? 1);
-      if (same && oldLinks.has(r.link)) {
-        oldUnchanged += 1;
+      if (oldLinks.has(r.link)) {
+        if (same) {
+          oldUnchanged += 1;
+          continue;
+        }
+        // 창 밖 행은 점수가 이미 식어 있으니 다시 채점하지 않고 묶음 열만 바꾼다 —
+        // 소급분 3천 행을 매 회차 사전에 돌리면 그것만으로 20초였다
+        oldPayload.push({
+          link: r.link,
+          title: r.title,
+          pub_date: r.pub_date,
+          cluster_id: c?.clusterId ?? r.link,
+          cluster_hosts: c?.clusterHosts ?? 1,
+          is_rep: c?.isRep ?? true,
+        });
         continue;
       }
       if (same && r.scored_at && now - new Date(r.scored_at).getTime() < RESCORE_AFTER_MS) {
@@ -352,12 +369,7 @@ export async function GET(request: NextRequest) {
   // 창 밖 재채점 행은 열 구성이 달라(묶음 열 없음) 따로 upsert한다 —
   // 한 번에 보내면 PostgREST가 빠진 열을 null로 채운다
   const retagLinks = new Set(retagRows.map((r) => r.link));
-  const all = Array.from(payload.values()).filter((r) => !retagLinks.has(r.link as string));
-  // 창 안 행을 먼저, 창 밖 행은 뒤에 — 시간이 모자라면 창 밖 행이 다음 회차로 밀린다
-  const rows = [
-    ...all.filter((r) => !oldLinks.has(r.link as string)),
-    ...all.filter((r) => oldLinks.has(r.link as string)),
-  ];
+  const rows = Array.from(payload.values()).filter((r) => !retagLinks.has(r.link as string));
   const retagPayload = Array.from(payload.values()).filter((r) => retagLinks.has(r.link as string));
 
   if (dry) {
@@ -393,7 +405,9 @@ export async function GET(request: NextRequest) {
       backlogLeft,
       clusters: groups.size,
       multi: Array.from(groups.values()).filter((g) => g.n >= 2).length,
-      absorbed: rows.filter((r) => r.is_rep === false).length,
+      absorbed:
+        rows.filter((r) => r.is_rep === false).length +
+        oldPayload.filter((r) => r.is_rep === false).length,
       sample,
       weak,
     });
@@ -404,12 +418,8 @@ export async function GET(request: NextRequest) {
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
-    const elapsed = Date.now() - startedAt;
-    if (
-      (oldLinks.has(chunk[0].link as string) && elapsed > OLD_ROWS_DEADLINE_MS) ||
-      elapsed > HARD_DEADLINE_MS
-    ) {
-      deferred = rows.length - i;
+    if (Date.now() - startedAt > HARD_DEADLINE_MS) {
+      deferred += rows.length - i;
       break;
     }
     const { error: upErr } = await supabase
@@ -422,6 +432,24 @@ export async function GET(request: NextRequest) {
       );
     }
     saved += chunk.length;
+  }
+  // 창 밖 행의 묶음 열 — 창 안 행 다음에, 시간이 남을 때만
+  let oldSaved = 0;
+  for (let i = 0; i < oldPayload.length; i += CHUNK) {
+    const elapsed = Date.now() - startedAt;
+    if (elapsed > OLD_ROWS_DEADLINE_MS) {
+      deferred += oldPayload.length - i;
+      break;
+    }
+    const chunk = oldPayload.slice(i, i + CHUNK);
+    const { error: oldErr } = await supabase.from("articles").upsert(chunk, { onConflict: "link" });
+    if (oldErr) {
+      return NextResponse.json(
+        { error: "Backlog upsert failed", detail: oldErr.message, saved, oldSaved },
+        { status: 500 },
+      );
+    }
+    oldSaved += chunk.length;
   }
   let retagged = 0;
   for (let i = 0; i < retagPayload.length; i += CHUNK) {
@@ -516,7 +544,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const absorbed = rows.filter((r) => r.is_rep === false).length;
+  const absorbed =
+    rows.filter((r) => r.is_rep === false).length +
+    oldPayload.filter((r) => r.is_rep === false).length;
 
   return NextResponse.json({
     ok: true,
@@ -525,6 +555,7 @@ export async function GET(request: NextRequest) {
     backlog: backlogCount,
     backlogLeft,
     oldUnchanged,
+    oldSaved,
     freshUnchanged,
     deferred,
     elapsedMs: Date.now() - startedAt,
