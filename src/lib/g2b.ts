@@ -236,6 +236,39 @@ export type FetchResult = {
   error?: string;
 };
 
+/**
+ * 공고명·수요기관으로 검색한다(PPSSrch 오퍼레이션). 창 안을 전부 받는 fetchBidWindow와 달리
+ * 서버가 거르므로 긴 기간(수개월)을 훑을 수 있다 — 특정 기관이 특정 사업을 낸 적이
+ * 있는지 확인하는 진단용. 날짜 창은 한 번에 1개월까지만 받으므로 호출자가 나눠 돈다.
+ */
+export async function searchBids(opts: FetchWindow & { keyword?: string; agency?: string }): Promise<FetchResult> {
+  const numOfRows = opts.numOfRows ?? 100;
+  const maxPages = opts.maxPages ?? 3;
+  const operation = `${WORK_DIVS[opts.workDiv]}PPSSrch`;
+  const rows: G2bRow[] = [];
+  let totalCount = 0;
+  let pages = 0;
+  let base: string | null = null;
+  for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
+    const page = await call(operation, {
+      inqryDiv: "1",
+      inqryBgnDt: toKstStamp(opts.from),
+      inqryEndDt: toKstStamp(opts.to),
+      ...(opts.keyword ? { bidNtceNm: opts.keyword } : {}),
+      ...(opts.agency ? { dminsttNm: opts.agency } : {}),
+      pageNo: String(pageNo),
+      numOfRows: String(numOfRows),
+    });
+    pages = pageNo;
+    base = page.base;
+    if (!page.ok) return { ok: false, rows, totalCount, pages, truncated: false, base, error: page.error };
+    totalCount = page.totalCount || totalCount;
+    rows.push(...page.rows);
+    if (page.rows.length < numOfRows) return { ok: true, rows, totalCount, pages, truncated: false, base };
+  }
+  return { ok: true, rows, totalCount, pages, truncated: rows.length < totalCount, base };
+}
+
 /** 공고게시일시(inqryDiv=1) 기준으로 창(window) 안의 공고를 전부 가져온다. */
 export async function fetchBidWindow(opts: FetchWindow): Promise<FetchResult> {
   const numOfRows = opts.numOfRows ?? 300;
