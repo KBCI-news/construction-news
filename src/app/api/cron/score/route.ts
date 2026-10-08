@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { assignClusters } from "@/lib/cluster";
+import { clusterArticles, type ClusterSummary } from "@/lib/cluster";
 import { stripHtml } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
 import { extractIndicators } from "@/lib/indicators";
@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
 
   // ---- 1) 클러스터링 대상: 태그 기사 전부 + 상위 점수 기사 ---------------------
   const clusterRows: Row[] = [];
+  let clusterSummaries: ClusterSummary[] = [];
   try {
     const tagged = await fetchPaged(
       supabase,
@@ -152,9 +153,11 @@ export async function GET(request: NextRequest) {
       pubDate: r.pub_date,
       sourceHost: r.source_host,
       matchedTerms: scoreOf(r).matchedTerms,
+      description: r.description,
     }));
-    const clusters = assignClusters(prelim);
-    const byLink = new Map(clusters.map((c) => [c.link, c]));
+    const clustered = clusterArticles(prelim);
+    clusterSummaries = clustered.clusters;
+    const byLink = new Map(clustered.assignments.map((c) => [c.link, c]));
 
     for (const r of clusterRows) {
       const c = byLink.get(r.link);
@@ -275,6 +278,17 @@ export async function GET(request: NextRequest) {
       .filter((g) => g.n >= 2)
       .sort((a, b) => b.n - a.n)
       .slice(0, 20);
+    // 오병합 의심 — 구성원이 프로필과 덜 닮은 묶음부터
+    const titleOf = new Map(clusterRows.map((r) => [r.link, stripHtml(r.title).slice(0, 50)]));
+    const weak = clusterSummaries
+      .filter((c) => c.links.length >= 3)
+      .sort((a, b) => a.coherence - b.coherence)
+      .slice(0, 12)
+      .map((c) => ({
+        n: c.links.length,
+        coherence: Math.round(c.coherence * 100) / 100,
+        titles: c.links.slice(0, 5).map((l) => titleOf.get(l) ?? l),
+      }));
     return NextResponse.json({
       ok: true,
       dry: true,
@@ -284,6 +298,7 @@ export async function GET(request: NextRequest) {
       multi: Array.from(groups.values()).filter((g) => g.n >= 2).length,
       absorbed: rows.filter((r) => r.is_rep === false).length,
       sample,
+      weak,
     });
   }
 
