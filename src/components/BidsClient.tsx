@@ -272,13 +272,13 @@ export default function BidsClient() {
         {/* 뉴스 태그 줄과 같은 한 줄 가로 스크롤 — 카드 오른쪽 끝까지 흘려 다음 칩이
             잘려 보이게 한다(옆으로 넘길 수 있다는 단서). 모바일은 칩 줄을 넓게 쓰려고
             라벨을 뺀다. 위아래 py-1은 포커스 링이 잘리지 않게 */}
-        <div className="border-t border-[var(--line)] px-3 py-2.5 sm:flex sm:items-start sm:gap-2.5 sm:px-4">
+        <div className="border-t border-[var(--line)] px-3 py-3.5 sm:flex sm:items-start sm:gap-2.5 sm:px-4">
           <span className="group-label hidden leading-[40px] sm:block">분야</span>
           <div className="min-w-0 flex-1">
             <ul
               ref={chipsRef}
               aria-label="분야"
-              className="-my-1 -ml-1 -mr-3 flex gap-1.5 overflow-x-auto py-1 pl-1 pr-3 [scrollbar-width:none] sm:-mr-1 sm:flex-wrap sm:overflow-visible sm:pr-1 [&::-webkit-scrollbar]:hidden"
+              className="-my-1 -ml-1 -mr-3 flex gap-2 overflow-x-auto py-1 pl-1 pr-3 [scrollbar-width:none] sm:-mr-1 sm:flex-wrap sm:overflow-visible sm:pr-1 [&::-webkit-scrollbar]:hidden"
             >
               {[{ id: "", label: "전체" }, ...BID_AREAS.map((a) => ({ id: a.id, label: a.label }))].map(
                 (chip) => {

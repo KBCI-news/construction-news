@@ -132,11 +132,13 @@ body {
   /* 필터 칩 — 테두리 대신 면으로. 켜진 것은 KB 브랜드 옐로우로 드러난다.
      노란 바탕에는 어두운 잉크가 필요하다 (흰 글자는 대비 미달).
      좌우 13px — 360~430px 폭에서 다음 칩이 반쯤 비쳐 옆으로 밀 수 있음을 알린다. */
+  /* 흰 바탕 + 윤곽선 — 회색 면은 카드 뒤 페이지 배경과 겹쳐 보여 구멍처럼 읽혔다.
+     선택은 노란 면으로 채우고 윤곽선도 같은 색으로 바꿔 크기가 흔들리지 않는다 */
   .chip {
-    @apply inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full bg-gray-100 px-[13px] text-[13.5px] font-bold text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900 active:bg-gray-200;
+    @apply inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border border-gray-300 bg-white px-[14px] text-[13.5px] font-bold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100;
   }
   .chip-on {
-    @apply bg-[#FFB81C] text-gray-900 hover:bg-[#FFB81C] hover:text-gray-900 active:bg-[#FFB81C];
+    @apply border-[#FFB81C] bg-[#FFB81C] text-gray-900 hover:border-[#FFB81C] hover:bg-[#FFB81C] hover:text-gray-900 active:bg-[#FFB81C];
   }
 
   /* 세그먼트 컨트롤 — 홈이 파인 트랙 위에 선택만 흰 면으로 떠오른다 */
