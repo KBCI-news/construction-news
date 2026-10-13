@@ -32,6 +32,8 @@ type NewsTag = {
   q?: string;
   /** 수집 검색어로 찾는다(보관함) — 요약에 회사명이 안 보여도 그 검색어로 가져온 기사면 포함 */
   qt?: string;
+  /** 보관함(keep) 기사만 — 수집 때 회사명을 확인해 표시한 기사. 부분 색인이라 빠르다 */
+  keep?: boolean;
   /** 같은 사건의 중복 기사(is_rep=false)도 받는다 — 언급이 드문 회사명 태그용 */
   dupes?: boolean;
 };
@@ -79,9 +81,9 @@ const TAGS: NewsTag[] = [
     // 중복 기사도 함께 받는다 — 회사명이 든 쪽이 대표 기사가 아닐 때가 많다
     id: "kbci",
     label: "KB신용정보",
-    // 수집 검색어(qt)로 찾으면 네이버의 느슨한 매칭(KB + 신용정보)이 그대로 들어온다 —
-    // 제목·요약에 회사명이 있는 기사만. 보관함(5년)이라 기간 전체면 다 보인다
-    q: "KB신용정보",
+    // 수집 때 제목·요약에 회사명을 확인해 keep 으로 표시한 기사(5년 보관). 제목·요약
+    // ilike 로 매번 7만 행을 훑으면 5초가 걸려 가끔 빈 화면이 됐다
+    keep: true,
     dupes: true,
   },
   {
@@ -195,6 +197,7 @@ export default function NewsroomClient() {
     const effectiveQ = q || tag.q || "";
     if (effectiveQ) sp.set("q", effectiveQ);
     if (tag.qt) sp.set("qt", tag.qt);
+    if (tag.keep) sp.set("keep", "1");
     if (tag.desk) sp.set("desk", tag.desk);
     // 내장 검색어로 동작하는 동안만 — 사용자 검색어가 태그를 대신하면 다른 검색과 같이 대표 기사만
     if (tag.dupes && !q) sp.set("dupes", "1");
@@ -521,7 +524,7 @@ export default function NewsroomClient() {
             {/* 검색어 태그(KB신용정보 등)는 검색과 같은 범위 — 왜 비었는지 같은 말로 밝힌다 */}
             {(q || tag.q) && (
               <p className="mt-1 text-[13.5px] text-gray-600">
-                검색은 최근 30일 보관 기사에서 찾습니다
+                검색은 보관 중인 기사(태그 기사 3년, 일반 기사 30일)에서 찾습니다
               </p>
             )}
             {!q && !narrowed && (

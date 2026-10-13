@@ -98,6 +98,9 @@ export async function GET(request: NextRequest) {
   // qt = 수집 검색어. 네이버 요약에 검색어가 안 보이는 기사가 많아 제목·요약 검색만으로는
   // "KB신용정보"로 가져온 기사 대부분을 놓쳤다 — 수집 검색어(query_terms)로도 찾는다
   const qt = (p.get("qt") ?? "").replace(/[%,(){}]/g, " ").trim();
+  // keep=1 : 보관함(KB신용정보 언급 기사). 제목·요약 ilike 로 7만 행을 훑으면 5초가
+  // 걸렸다 — 수집 때 회사명을 확인해 keep 으로 표시하고 부분 색인으로 1ms 에 찾는다
+  const keepOnly = p.get("keep") === "1";
   const sortParam = p.get("sort");
   const minScore = Number(p.get("minScore") ?? "");
   const limit = Math.min(Math.max(Number(p.get("limit") ?? 60), 1), 200);
@@ -132,6 +135,7 @@ export async function GET(request: NextRequest) {
       `desks.ov.{${TAG_DESKS.join(",")}},kinds.ov.{${(LEGAL_KINDS as string[]).join(",")}}`,
     );
   }
+  if (keepOnly) query = query.eq("keep", true);
   if (qt) {
     query = query.or(
       `query_terms.cs.{${qt}},title.ilike.%${qt}%,description.ilike.%${qt}%`,
@@ -166,6 +170,14 @@ export async function GET(request: NextRequest) {
 
   // 큐레이션 마이그레이션(0004)이 아직 적용되지 않은 환경에서도 사이트가 죽지 않게
   // 기본 컬럼만으로 재조회한다. 등급·근거는 UI에서 자동으로 감춰진다.
+  // 열이 없을 때(42703)만 — 시간 초과·연결 오류까지 여기로 빠지면 검색어 조건 없는
+  // 최신 150건에서 다시 걸러 "0건"으로 보였다(KB신용정보 태그가 가끔 비던 원인).
+  if (error && error.code !== "42703") {
+    return NextResponse.json(
+      { error: "Failed to read articles", detail: error.message },
+      { status: 500 },
+    );
+  }
   if (error) {
     let legacyQuery = supabase
       .from("articles")

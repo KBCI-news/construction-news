@@ -3,7 +3,7 @@ import { QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
-import { isKeepTerm, keepMatches, naverQueryOf, retentionCutoff } from "@/lib/archive";
+import { keepMatches, naverQueryOf, retentionCutoff } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -110,7 +110,6 @@ export async function GET(request: NextRequest) {
 
   const runTerm = async (term: string) => {
     const cutoff = retentionCutoff(term, nowMs).getTime();
-    const keepTerm = isKeepTerm(term);
     // 태그가 안 붙는 기사는 어차피 30일 뒤 정리된다 — 그보다 오래된 건 저장하지 않는다
     const generalCutoff = nowMs - 30 * 86_400_000;
     const report: TermReport = { term, pages: 0, fetched: 0, kept: 0, oldest: null, newest: null, status: "ok" };
@@ -138,7 +137,7 @@ export async function GET(request: NextRequest) {
           olderThanCutoff = true;
           continue;
         }
-        const keep = keepTerm && keepMatches(item.title, item.description);
+        const keep = keepMatches(item.title, item.description);
         const existing = byLink.get(item.link);
         if (existing) {
           if (!existing.query_terms.includes(term)) existing.query_terms.push(term);
