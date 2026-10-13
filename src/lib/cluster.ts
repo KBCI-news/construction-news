@@ -65,9 +65,12 @@ const DESC_VERBATIM = 0.4;
 const DESC_MAX_CHARS = 240;
 // 묶음마다 비교용으로 들고 있는 요약 수 — 보도자료 전재는 처음 몇 건이면 대표성이 있다
 const DESC_KEEP_PER_CLUSTER = 6;
-// 한 묶음이 걸칠 수 있는 최대 날짜 수(KST). 사흘짜리 사안(예고→부과→반응)은 잇고,
-// 그 이상은 새 묶음으로 끊어 '개인정보 유출'류 상시 주제가 한 덩어리로 자라지 않게 한다.
-const MAX_SPAN_DAYS = 3;
+// 한 묶음이 걸칠 수 있는 최대 날짜 수(KST)와 후보를 찾는 과거 날짜 수.
+// 보도자료 전재는 주말·연휴를 끼고 사나흘에 걸쳐 나온다("KB국민카드 네팔 스마트도서관"이
+// 10/8·10/9·10/11에 각각 남았다). 닷새까지 잇되 비교는 늘 묶음 프로필 전체와 하므로
+// '개인정보 유출'류 상시 주제가 연쇄로 한 덩어리가 되지는 않는다.
+const MAX_SPAN_DAYS = 5;
+const LOOKBACK_DAYS = 3;
 // 희소 토큰 기준 — 전체 집합에서 이 횟수 이하로 나오는 토큰
 const RARE_DF = 3;
 const STRONG_MAX_DF = 50;
@@ -262,9 +265,9 @@ type Cluster = {
  * - 토큰 가중치 w = ln(N/df)² — 집합 안에서 흔한 토큰(개인정보·대출·금융)은 거의 0,
  *   드문 토큰(여의도순복음교회·85만·햇살론유스)은 크다.
  * - 기사 ↔ 묶음 유사도 = 가중 자카드(묶음 쪽은 토큰별 구성원 비율로 희석).
- * - 비교 범위는 같은 KST 날짜와 전날에 등록된 묶음. 묶음은 구성원이 들어온 날마다
- *   등록되므로 사흘짜리 사안이 이어지되(MAX_SPAN_DAYS), 비교는 늘 프로필 전체와
- *   하므로 연쇄 병합(A~B, B~C ⇒ A~C)으로 멀리 떠내려가지 않는다.
+ * - 비교 범위는 같은 KST 날짜부터 LOOKBACK_DAYS 전까지 등록된 묶음. 묶음은 구성원이
+ *   들어온 날마다 등록되므로 며칠짜리 사안이 이어지되(MAX_SPAN_DAYS), 비교는 늘 프로필
+ *   전체와 하므로 연쇄 병합(A~B, B~C ⇒ A~C)으로 멀리 떠내려가지 않는다.
  * - 역색인으로 토큰을 하나라도 공유하는 묶음만 후보로 본다 — O(n²)를 피한다.
  */
 export function assignClusters(items: ClusterInput[]): ClusterAssignment[] {
@@ -387,9 +390,9 @@ export function clusterArticles(items: ClusterInput[]): {
   for (const day of days) {
     const sorted = buckets.get(day)!.slice().sort((a, b) => b.time - a.time);
     for (const p of sorted) {
-      // 후보: 오늘·어제 색인에서 토큰을 하나라도 공유하는 묶음
+      // 후보: 오늘부터 LOOKBACK_DAYS 전까지의 색인에서 토큰을 하나라도 공유하는 묶음
       const seen = new Set<Cluster>();
-      for (const d of [day, day - 1]) {
+      for (let d = day; d >= day - LOOKBACK_DAYS; d--) {
         const byToken = index.get(d);
         if (!byToken) continue;
         for (const t of p.tokens) {
@@ -490,7 +493,7 @@ export function clusterArticles(items: ClusterInput[]): {
       if (dead.has(c)) continue;
       const seen = new Set<Cluster>();
       for (const day of c.days) {
-        for (const d of [day - 1, day, day + 1]) {
+        for (let d = day - LOOKBACK_DAYS; d <= day + LOOKBACK_DAYS; d++) {
           const byToken = index.get(d);
           if (!byToken) continue;
           for (const t of c.profile.keys()) {
