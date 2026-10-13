@@ -179,7 +179,10 @@ export async function GET(request: NextRequest) {
   if (rows.length > 0) {
     const { error, count } = await supabase
       .from("articles")
-      .upsert(rows, { onConflict: "link", count: "exact" });
+      // 이미 있는 기사는 건드리지 않는다 — 30분마다 검색어당 최신 100건을 받으므로 대부분
+      // 기존 행인데, 그걸 매번 다시 써서 색인 12개를 갱신하는 것이 DB 부하의 대부분이었다
+      // (500행 upsert 한 번에 4초). 점수·묶음은 채점 크론이, 썸네일은 이미지 크론이 맡는다.
+      .upsert(rows, { onConflict: "link", ignoreDuplicates: true, count: "exact" });
     if (error) {
       return NextResponse.json(
         { error: "Supabase upsert failed", detail: error.message },
