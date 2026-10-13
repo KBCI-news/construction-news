@@ -191,7 +191,10 @@ export async function GET(request: NextRequest) {
   let upserted = 0;
   for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
     const chunk = rows.slice(i, i + UPSERT_CHUNK);
-    const { error } = await supabase.from("articles").upsert(chunk, { onConflict: "link" });
+    // 이미 있는 기사는 그대로 둔다(색인 갱신 비용) — 새로 들어오는 과거 기사만 쓴다
+    const { error } = await supabase
+      .from("articles")
+      .upsert(chunk, { onConflict: "link", ignoreDuplicates: true });
     if (error) {
       return NextResponse.json(
         { error: "Backfill upsert failed", detail: error.message, upserted, reports },
