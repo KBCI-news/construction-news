@@ -210,6 +210,16 @@ function descGrams(description: string | null | undefined): Set<string> {
   return out;
 }
 
+/**
+ * 인사 공지 — "[인사] KB국민카드", "12월29일 인사", "오늘의인사-권익위, 경찰청, … KB금융 외",
+ * "[인사] KB국민카드·KB신용정보·KB캐피탈". 같은 날 같은 발표를 매체마다 제목을 달리 뽑아
+ * 겹치는 어절이 거의 없다. 같은 날 인사 공지끼리는 기관 토큰 하나만 겹쳐도 같은 사안이다.
+ */
+function isPersonnelNotice(title: string): boolean {
+  const t = stripHtml(title).replace(/\s+/g, " ").trim();
+  return /^\[?\s*(인사|오늘의\s*인사|인사\s*발령|임원\s*인사)\s*\]?/u.test(t) || /(\d+월\s*\d+일|오늘의)\s*인사\b/u.test(t) || /\s인사$/u.test(t);
+}
+
 // KST 기준 날짜 번호 — UTC로 나누면 09:00 KST 경계에서 같은 사안이 갈라진다
 function kstDayNum(pubDate: string): number {
   const d = new Date(pubDate);
@@ -229,6 +239,7 @@ type Prepared = {
   tokens: string[];
   weight: number; // Σ w(token)
   descGrams: Set<string>;
+  personnel: boolean;
 };
 
 type Cluster = {
@@ -242,6 +253,7 @@ type Cluster = {
   profile: Map<string, number>;
   members: Prepared[];
   descs: Set<string>[];
+  personnel: boolean;
 };
 
 /**
@@ -265,15 +277,19 @@ export function clusterArticles(items: ClusterInput[]): {
 } {
   const prepared: Prepared[] = items.map((it) => {
     const norm = normTitle(it.title);
+    const personnel = isPersonnelNotice(it.title);
     return {
       it,
       day: kstDayNum(it.pubDate),
       time: new Date(it.pubDate).getTime(),
       norm,
       grams: bigrams(norm),
-      tokens: isDigest(it.title) ? [] : Array.from(keyTokens(it.title)),
+      // 인사 공지는 기관명 나열("[인사] KB국민카드·KB신용정보·KB캐피탈")이 정상 제목이라
+      // 소식란 예외를 두지 않는다 — 기관 토큰이 있어야 같은 날 인사끼리 묶인다
+      tokens: isDigest(it.title) && !personnel ? [] : Array.from(keyTokens(it.title)),
       weight: 0,
       descGrams: descGrams(it.description),
+      personnel,
     };
   });
 
@@ -395,7 +411,9 @@ export function clusterArticles(items: ClusterInput[]): {
         const m = compare(p, c);
         const d = dice(p.grams, c.repGrams);
         const dd = descMatch(p.descGrams, c);
-        if (!accept(m) && d < DICE_VERBATIM && dd < DESC_VERBATIM) continue;
+        // 같은 날 인사 공지끼리는 기관 토큰 하나만 겹쳐도 같은 발표
+        const personnel = p.personnel && c.personnel && c.firstDay === day && m.shared >= 1;
+        if (!accept(m) && d < DICE_VERBATIM && dd < DESC_VERBATIM && !personnel) continue;
         const score = Math.max(scoreOf(m), d, dd);
         if (score > bestScore) {
           bestScore = score;
@@ -420,6 +438,7 @@ export function clusterArticles(items: ClusterInput[]): {
           profile: new Map(p.tokens.map((t) => [t, 1])),
           members: [p],
           descs: p.descGrams.size >= 6 ? [p.descGrams] : [],
+          personnel: p.personnel,
         };
         clusters.push(c);
         register(c, day, p.tokens);
@@ -485,7 +504,9 @@ export function clusterArticles(items: ClusterInput[]): {
         const lo = Math.min(c.firstDay, o.firstDay);
         const hi = Math.max(...c.days, ...o.days);
         if (hi - lo >= MAX_SPAN_DAYS) continue;
-        if (!accept(profileMatch(c, o)) && !descPairMatch(c, o)) continue;
+        const pm = profileMatch(c, o);
+        const personnelPair = c.personnel && o.personnel && c.firstDay === o.firstDay && pm.shared >= 1;
+        if (!accept(pm) && !descPairMatch(c, o) && !personnelPair) continue;
         // 먼저 생긴 묶음(firstDay가 이른 쪽)이 남는다
         const [keep, drop] = c.firstDay <= o.firstDay ? [c, o] : [o, c];
         for (const m of drop.members) keep.members.push(m);
