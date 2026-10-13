@@ -20,6 +20,9 @@ jobs:
         env:
           PROBE_PATH: ${{ inputs.path }}
         run: |
-          curl -fsS --max-time 90 \
+          # 오류여도 본문을 보여 준다(-f 는 본문을 숨긴다) — 그 뒤 상태 코드로 실패 판정
+          code=$(curl -sS --max-time 90 -o /tmp/body -w '%{http_code}' \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.CRON_URL }}${PROBE_PATH}"
+            "${{ secrets.CRON_URL }}${PROBE_PATH}")
+          cat /tmp/body; echo; echo "HTTP ${code}"
+          [ "${code}" -lt 400 ]
