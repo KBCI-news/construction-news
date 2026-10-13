@@ -25,7 +25,7 @@ const KEEP_PHRASES = ["kb신용정보", "케이비신용정보"];
 const squash = (s: string | null | undefined): string =>
   (s ?? "").toLowerCase().replace(/<[^>]+>/g, "").replace(/\s+/g, "");
 
-/** 보관 검색어로 가져온 기사 중 실제로 그 회사를 말하는 기사인지 */
+/** 제목·요약에 회사명이 실제로 있는 기사인지 — 어느 검색어로 왔든 이면 보관함(keep) */
 export function keepMatches(title: string, description: string | null | undefined): boolean {
   const hay = squash(title) + " " + squash(description);
   return KEEP_PHRASES.some((p) => hay.includes(p));

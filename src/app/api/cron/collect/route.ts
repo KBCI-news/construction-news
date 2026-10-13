@@ -3,7 +3,7 @@ import { POLL_MINUTES, QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
-import { isKeepTerm, keepMatches, naverQueryOf } from "@/lib/archive";
+import { keepMatches, naverQueryOf } from "@/lib/archive";
 import type { NaverNewsItem } from "@/app/api/naver-news/route";
 
 export const dynamic = "force-dynamic";
@@ -167,9 +167,8 @@ export async function GET(request: NextRequest) {
       importance_parts: res.parts,
       scored_at: new Date(nowMs).toISOString(),
       query_terms: Array.from(termsByLink.get(item.link) ?? []),
-      keep:
-        Array.from(termsByLink.get(item.link) ?? []).some(isKeepTerm) &&
-        keepMatches(item.title, item.description),
+      // 어느 검색어로 왔든 제목·요약에 회사명이 있으면 보관함 — KB신용정보 태그는 이 표시로 찾는다
+      keep: keepMatches(item.title, item.description),
     });
   }
 
