@@ -124,16 +124,19 @@ export async function GET(request: NextRequest) {
   let query = supabase.from("articles").select(SELECT);
   if (since) query = query.gte("pub_date", since);
 
-  if (desk) query = query.contains("desks", [desk]);
+  // 데스크·태그 조회는 desks <> '{}' 를 함께 건다 — 중복이지만 "태그 붙은 대표 기사"만 담은
+  // 부분 색인(articles_tagged_rep_*_idx)을 타게 하는 조건이다. 이게 없으면 날짜 색인을
+  // 걸어 태그 없는 기사 2.8만 행을 걸러 가며 5초가 걸렸고(8초 시간 초과도 났다), 있으면 8ms.
+  if (desk) query = query.contains("desks", [desk]).neq("desks", "{}");
   if (scope === "general") query = query.eq("desks", "{}");
   else if (scope === "curated") query = query.neq("desks", "{}");
   // scope=tagged : 뉴스 화면의 태그 중 하나에라도 속하는 기사만 ("전체" 태그).
   // 태그 체계에 없는 데스크(정보보호·부실채권·대출 등)만 걸린 기사는 뺀다.
   // (서버에서 다시 거르던 것을 SQL 로 옮겨 offset 이어 받기가 정확히 맞물린다)
   else if (scope === "tagged") {
-    query = query.or(
-      `desks.ov.{${TAG_DESKS.join(",")}},kinds.ov.{${(LEGAL_KINDS as string[]).join(",")}}`,
-    );
+    query = query
+      .neq("desks", "{}")
+      .or(`desks.ov.{${TAG_DESKS.join(",")}},kinds.ov.{${(LEGAL_KINDS as string[]).join(",")}}`);
   }
   if (keepOnly) query = query.eq("keep", true);
   if (qt) {
@@ -166,7 +169,12 @@ export async function GET(request: NextRequest) {
   }
 
   const fetchLimit = sort === "relevance" ? Math.min(limit * 4, 400) : limit;
-  const { data, error } = await query.range(offset, offset + fetchLimit - 1);
+  let { data, error } = await query.range(offset, offset + fetchLimit - 1);
+  // 일시적 오류(시간 초과·연결 끊김)는 한 번 더 — 첫 화면이 빨간 오류로 끝나는 일을 줄인다
+  if (error && error.code !== "42703") {
+    await new Promise((r) => setTimeout(r, 300));
+    ({ data, error } = await query.range(offset, offset + fetchLimit - 1));
+  }
 
   // 큐레이션 마이그레이션(0004)이 아직 적용되지 않은 환경에서도 사이트가 죽지 않게
   // 기본 컬럼만으로 재조회한다. 등급·근거는 UI에서 자동으로 감춰진다.
