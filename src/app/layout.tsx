@@ -4,6 +4,7 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ExternalBrowserEscape } from "@/components/ExternalBrowserEscape";
+import { CronTick } from "@/components/CronTick";
 
 export const metadata: Metadata = {
   title: { default: "KBCI 뉴스룸", template: "%s | KBCI 뉴스룸" },
@@ -32,6 +33,7 @@ export default function RootLayout({
           본문 바로가기
         </a>
         <ExternalBrowserEscape />
+        <CronTick />
         <Suspense fallback={null}>
           <Header />
         </Suspense>

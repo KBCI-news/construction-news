@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { markCronDone } from "@/lib/cron-state";
 import { fetchOgImage } from "@/lib/og";
 
 export const dynamic = "force-dynamic";
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  await markCronDone(supabase, "images");
   return NextResponse.json({
     ok: true,
     candidates: rows.length,

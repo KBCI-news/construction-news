@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { POLL_MINUTES, QUERY_TERMS } from "@/lib/lexicon";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { markCronDone } from "@/lib/cron-state";
 import { hostOf } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
 import { keepMatches, naverQueryOf } from "@/lib/archive";
@@ -197,6 +198,7 @@ export async function GET(request: NextRequest) {
   const { error: purgeError } = await supabase.rpc("purge_old_articles");
   await supabase.rpc("purge_old_search_logs");
 
+  await markCronDone(supabase, "collect");
   return NextResponse.json({
     ok: true,
     queriesRun: tasks.length,
