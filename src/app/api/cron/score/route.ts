@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { markCronDone } from "@/lib/cron-state";
 import { clusterArticles, type ClusterSummary } from "@/lib/cluster";
 import { stripHtml } from "@/lib/format";
 import { scoreArticle } from "@/lib/scoring";
@@ -548,6 +549,7 @@ export async function GET(request: NextRequest) {
     rows.filter((r) => r.is_rep === false).length +
     oldPayload.filter((r) => r.is_rep === false).length;
 
+  await markCronDone(supabase, "score");
   return NextResponse.json({
     ok: true,
     windowHours: WINDOW_HOURS,
