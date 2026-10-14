@@ -39,75 +39,54 @@ function BrandWordmark() {
 
 function BubbleIcon() {
   return (
-    <svg className="h-[15px] w-[15px]" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
     </svg>
   );
 }
 
-// 새 창으로 나가는 링크 표시(↗)
+// 새 창으로 나가는 링크 표시(↗) — 탭 글자와 같은 먹색이라 눈에 띈다
 function ExternalIcon() {
   return (
-    <svg className="h-[11px] w-[11px] text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.4} stroke="currentColor" aria-hidden>
+    <svg className="h-[13px] w-[13px] text-gray-900" fill="none" viewBox="0 0 24 24" strokeWidth={2.8} stroke="currentColor" aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
     </svg>
   );
 }
 
-// GNB는 최상위 섹션 셋만 둔다. 뉴스 주제·범위는 뉴스 화면 안의 칩이 담당한다.
+// GNB는 최상위 섹션 셋 + 'KB의 생각'(외부). 뉴스 주제·범위는 뉴스 화면 안의 칩이 담당한다.
 const SECTIONS = [
   { href: "/", label: "뉴스" },
   { href: "/indicators", label: "경제지표" },
   { href: "/bids", label: "입찰공고" },
 ];
 
-// 유틸리티 띠의 링크 — 띠 높이(40px) 전체가 터치 영역
-const UTIL_LINK =
-  "inline-flex h-full items-center gap-1 px-2.5 text-[13px] font-bold text-gray-800 transition-colors hover:text-[#7A5E08] active:opacity-60";
-
 export function Header() {
   const pathname = usePathname();
 
   return (
     // backdrop-blur는 모바일 스크롤 프레임을 깎아 먹는다 — 불투명 배경으로 충분
-    // 3px 띠 + 40px 유틸리티 띠 + 56px 브랜드 줄(=99px)은 스크롤로 사라지고 GNB 줄만 붙는다
-    // — 전체를 붙이면 폰 화면의 20%를 먹는다
-    <header className="no-print sticky top-[-99px] z-30 border-b border-[var(--line)] bg-white shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)]">
+    // 3px 띠 + 64px 브랜드 줄(=67px)은 스크롤로 사라지고 GNB 줄만 붙는다 — 전체를 붙이면 폰 화면의 14%를 먹는다
+    <header className="no-print sticky top-[-67px] z-30 border-b border-[var(--line)] bg-white shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)]">
       <div className="h-[3px] w-full bg-gradient-to-r from-[#FFB81C] to-[#FFD37A]" />
-
-      {/* 유틸리티 띠: KB의 생각(외부)·의견 — 브랜드 줄에서 떼어내 브랜드가 숨 쉬게 한다.
-          연노랑 바탕은 위의 KB 띠와 한 식구로 읽힌다 */}
-      <div className="border-b border-[#F3E2B3] bg-[#FFF4D6]">
-        <div className="mx-auto flex h-[40px] max-w-[1280px] items-stretch justify-end px-1.5 sm:px-6">
-          {/* KB금융 리서치 포털 'KB의 생각' — 외부 사이트라 새 창 */}
-          <a
-            href="https://kbthink.com/main.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="KB의 생각 (새 창)"
-            className={`${UTIL_LINK} text-gray-900`}
-          >
-            <KbThinkMark className="h-[13px] w-auto" />
-            <ExternalIcon />
-          </a>
-          <span className="my-auto h-3.5 w-px bg-[#E6CF95]" aria-hidden />
-          {/* 의견 접수는 섹션이 아니라 행동이라 GNB 탭 대신 유틸리티 링크 */}
-          <Link href="/feedback" className={UTIL_LINK}>
-            <BubbleIcon />
-            의견
-          </Link>
-        </div>
-      </div>
-
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
-        <div className="flex h-[56px] items-center">
+        <div className="flex h-[64px] items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-2" aria-label="KBCI 뉴스룸 홈">
             <BrandLogo />
             <BrandWordmark />
           </Link>
+          {/* 의견 접수는 섹션이 아니라 행동이라 GNB 탭 대신 버튼 */}
+          <Link
+            href="/feedback"
+            className="inline-flex min-h-[40px] shrink-0 items-center gap-1 rounded-full border border-gray-300 px-3.5 text-[13.5px] font-bold text-gray-800 transition-colors hover:border-[#FFB81C] hover:text-[#7A5E08] active:bg-gray-100"
+          >
+            <BubbleIcon />
+            의견
+          </Link>
         </div>
 
-        <nav aria-label="주요 섹션" className="grid grid-cols-3 pb-px sm:flex sm:gap-1">
+        {/* 폰에서는 네 칸 균등 그리드 — KB의 생각도 탭과 같은 폭. 넓은 화면은 탭을 왼쪽에, KB의 생각을 오른쪽 끝에 */}
+        <nav aria-label="주요 섹션" className="grid grid-cols-4 pb-px sm:flex sm:gap-1">
           {SECTIONS.map((item) => {
             // 기사 읽기는 뉴스의 하위 화면
             const active =
@@ -119,7 +98,7 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex min-h-[48px] items-center justify-center px-3 text-[15px] font-bold tracking-tight transition-colors active:bg-gray-50 sm:justify-start sm:text-[14px] ${
+                className={`relative flex min-h-[48px] items-center justify-center px-2 text-[15px] font-bold tracking-tight transition-colors active:bg-gray-50 sm:justify-start sm:px-3 sm:text-[14px] ${
                   active ? "text-gray-900" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
@@ -130,6 +109,17 @@ export function Header() {
               </Link>
             );
           })}
+          {/* KB금융 리서치 포털 'KB의 생각' — 외부 사이트라 새 창. 마크 높이는 탭 글자(15px)와 비슷하게 */}
+          <a
+            href="https://kbthink.com/main.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="KB의 생각 (새 창)"
+            className="flex min-h-[48px] items-center justify-center gap-1 px-2 text-gray-900 transition-opacity hover:opacity-70 active:bg-gray-50 sm:ml-auto sm:px-3"
+          >
+            <KbThinkMark className="h-[18px] w-auto" />
+            <ExternalIcon />
+          </a>
         </nav>
       </div>
     </header>
