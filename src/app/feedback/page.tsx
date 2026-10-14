@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FEEDBACK_FORM_URL, hasFeedbackForm } from "@/lib/feedback";
 
 export const metadata = {
-  title: "의견 보내기",
+  title: "의견",
   description: "KBCI 뉴스룸 이용 의견 접수",
 };
 

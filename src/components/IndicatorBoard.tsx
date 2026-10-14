@@ -23,7 +23,8 @@ const GROUPS: Group[] = [
   {
     title: "연체율",
     sub: "1개월 이상 갚지 못한 대출의 비율",
-    keys: ["household_delinq", "corp_delinq", "bank_card_delinq", "bank_delinq"],
+    // 기사 추출값(은행 연체율)은 공식 통계와 기준이 달라 뺐다 — 한국은행 통계 세 줄만
+    keys: ["household_delinq", "corp_delinq", "bank_card_delinq"],
   },
   { title: "금리", sub: "정책금리와 은행 대출금리", keys: ["base_rate", "household_loan_rate"] },
   { title: "가계부채", sub: "가계가 진 빚의 전체 규모", keys: ["household_credit"] },
@@ -41,7 +42,6 @@ const DESC: Record<string, string> = {
   household_delinq: delinqDesc("가계대출"),
   corp_delinq: delinqDesc("기업대출"),
   bank_card_delinq: delinqDesc("신용카드대출"),
-  bank_delinq: "기사에 보도된 국내 은행 대출 연체율입니다.",
   household_credit: "가계대출과 판매신용(카드 할부 구매 등)을 합한 가계 빚 총액입니다.",
   cpi_yoy: "소비자물가지수가 1년 전 같은 달보다 오른 비율입니다.",
   usd_krw:
@@ -1462,16 +1462,14 @@ export function IndicatorBoard() {
 
   const prepared = useMemo(() => items.filter(publishable).map(prepare), [items]);
 
+  // 묶음에 없는 지표(기사 추출 카드·저축은행 연체율 등)는 화면에 내지 않는다 — '기타'
+  // 묶음으로 보여 주던 것을 없앴다. 공식 통계로 자리 잡은 것만 묶음에 넣어 올린다.
   const groups = useMemo(() => {
     const byKey = new Map(prepared.map((p) => [p.key, p]));
-    const known = new Set(GROUPS.flatMap((g) => g.keys));
-    return [
-      ...GROUPS.map((g) => ({
-        ...g,
-        list: g.keys.map((k) => byKey.get(k)).filter((p): p is Prepared => Boolean(p)),
-      })),
-      { title: "기타", keys: [], list: prepared.filter((p) => !known.has(p.key)) },
-    ].filter((g) => g.list.length > 0);
+    return GROUPS.map((g) => ({
+      ...g,
+      list: g.keys.map((k) => byKey.get(k)).filter((p): p is Prepared => Boolean(p)),
+    })).filter((g) => g.list.length > 0);
   }, [prepared]);
 
   const remember = (key: string, collapse: boolean) => {
