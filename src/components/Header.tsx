@@ -48,7 +48,7 @@ function BubbleIcon() {
 // 새 창으로 나가는 링크 표시(↗) — 탭 글자와 같은 먹색이라 눈에 띈다
 function ExternalIcon() {
   return (
-    <svg className="h-[13px] w-[13px] text-gray-900" fill="none" viewBox="0 0 24 24" strokeWidth={2.8} stroke="currentColor" aria-hidden>
+    <svg className="h-[14px] w-[14px] shrink-0 text-gray-900" fill="none" viewBox="0 0 24 24" strokeWidth={2.8} stroke="currentColor" aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 17 17 7M9 7h8v8" />
     </svg>
   );
@@ -115,9 +115,11 @@ export function Header() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="KB의 생각 (새 창)"
-            className="flex min-h-[48px] items-center justify-center gap-1 px-2 text-gray-900 transition-opacity hover:opacity-70 active:bg-gray-50 sm:ml-auto sm:px-3"
+            className="flex min-h-[48px] items-center justify-center gap-0.5 px-0 text-gray-900 transition-opacity hover:opacity-70 active:bg-gray-50 sm:ml-auto sm:px-3"
           >
-            <KbThinkMark className="h-[18px] w-auto" />
+            {/* 360px 폰의 칸(82px)에 마크 폭(63.6px)+화살표가 꽉 차므로 shrink-0 — 줄어들면 마크가 작아지고 중심도 어긋난다.
+                마크 박스는 '생' 위의 점까지 포함해 글자 본체가 박스 중심보다 아래 — 2px 올려 탭 글자와 중심을 맞춘다 */}
+            <KbThinkMark className="relative -top-[2px] h-[20px] w-auto shrink-0 max-[339px]:h-[17px]" />
             <ExternalIcon />
           </a>
         </nav>
