@@ -10,7 +10,7 @@ function BrandLogo() {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <div className="flex h-[28px] w-[28px] items-center justify-center rounded-lg bg-[#FFB81C] text-[13px] font-extrabold tracking-tight text-gray-900">
+      <div className="flex h-[27px] w-[27px] items-center justify-center rounded-lg bg-[#FFB81C] text-[12px] font-extrabold tracking-tight text-gray-900">
         KB
       </div>
     );
@@ -20,22 +20,27 @@ function BrandLogo() {
     <img
       src="/kb-logo.png"
       alt=""
-      width={39}
-      height={28}
-      className="h-[28px] w-auto"
+      width={38}
+      height={27}
+      className="h-[27px] w-auto"
       onError={() => setFailed(true)}
     />
   );
 }
 
-// 'KB의 생각' 로고처럼 마크와 이름을 한 줄 워드마크로 묶는다 — 'KB'는 KB 색, 나머지는 먹색
+// 'KB의 생각' 로고처럼 마크와 이름을 한 줄 워드마크로 묶는다 — 글자는 한 색(먹색)
+// 360px 폰에서 오른쪽 버튼 둘(KB의 생각·의견)과 한 줄에 들어가야 해서 19px, 넓은 화면은 21px
 function BrandWordmark() {
   return (
-    <span className="whitespace-nowrap text-[21px] font-black leading-none tracking-[-0.02em] text-gray-900">
-      <span className="text-[#FFA800]">KB</span>CI 뉴스룸
+    <span className="whitespace-nowrap text-[19px] font-black leading-none tracking-[-0.02em] text-gray-900 sm:text-[21px]">
+      KBCI 뉴스룸
     </span>
   );
 }
+
+// 헤더 오른쪽 알약 버튼 공통 모양 — KB의 생각·의견이 같은 버튼으로 보이게
+const PILL =
+  "inline-flex min-h-[44px] items-center rounded-full border border-gray-300 text-[13.5px] font-bold text-gray-800 transition-colors hover:border-[#FFB81C] hover:text-[#7A5E08] active:bg-gray-100";
 
 // GNB는 최상위 섹션 셋만 둔다. 뉴스 주제·범위는 뉴스 화면 안의 칩이 담당한다.
 const SECTIONS = [
@@ -53,27 +58,24 @@ export function Header() {
     <header className="no-print sticky top-[-67px] z-30 border-b border-[var(--line)] bg-white shadow-[0_2px_20px_-12px_rgba(16,24,40,0.18)]">
       <div className="h-[3px] w-full bg-gradient-to-r from-[#FFB81C] to-[#FFD37A]" />
       <div className="mx-auto max-w-[1280px] px-4 sm:px-8">
-        <div className="flex h-[64px] items-center justify-between gap-3">
+        <div className="flex h-[64px] items-center justify-between gap-2">
           <Link href="/" className="flex items-center gap-2" aria-label="KBCI 뉴스룸 홈">
             <BrandLogo />
             <BrandWordmark />
           </Link>
-          <div className="flex shrink-0 items-center gap-2.5">
-            {/* KB금융 리서치 포털 'KB의 생각' — 외부 사이트라 새 창 */}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* KB금융 리서치 포털 'KB의 생각' — 외부 사이트라 새 창. 의견과 같은 알약 모양이라 눌리는 버튼으로 읽힌다 */}
             <a
               href="https://kbthink.com/main.html"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               aria-label="KB의 생각 (새 창)"
-              className="inline-flex min-h-[44px] items-center px-1 text-gray-900 transition-opacity hover:opacity-70 active:opacity-60"
+              className={`${PILL} px-3 text-gray-900`}
             >
-              <KbThinkMark className="h-[17px] w-auto" />
+              <KbThinkMark className="h-[15px] w-auto" />
             </a>
             {/* 의견 접수는 섹션이 아니라 행동이라 GNB 탭 대신 버튼 — 4번째 탭은 360px에서 탭 글자를 좁힌다 */}
-            <Link
-              href="/feedback"
-              className="inline-flex min-h-[44px] items-center gap-1 rounded-full border border-gray-300 px-3.5 text-[13.5px] font-bold text-gray-800 transition-colors hover:border-[#FFB81C] hover:text-[#7A5E08] active:bg-gray-100"
-            >
+            <Link href="/feedback" className={`${PILL} gap-1 px-3.5`}>
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
               </svg>
