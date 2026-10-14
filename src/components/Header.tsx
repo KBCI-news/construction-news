@@ -85,8 +85,9 @@ export function Header() {
           </Link>
         </div>
 
-        {/* 폰에서는 네 칸 균등 그리드 — KB의 생각도 탭과 같은 폭. 넓은 화면은 탭을 왼쪽에, KB의 생각을 오른쪽 끝에 */}
-        <nav aria-label="주요 섹션" className="grid grid-cols-4 pb-px sm:flex sm:gap-1">
+        {/* 폰에서는 네 항목을 양끝 정렬로 펼쳐 항목 '사이' 간격을 같게 — 칸을 균등하게 나누면 폭이 넓은 KB의 생각 쪽
+            간격만 좁아 보인다. 넓은 화면은 탭을 왼쪽에, KB의 생각을 오른쪽 끝에 */}
+        <nav aria-label="주요 섹션" className="flex justify-between pb-px sm:justify-start sm:gap-1">
           {SECTIONS.map((item) => {
             // 기사 읽기는 뉴스의 하위 화면
             const active =
@@ -104,7 +105,7 @@ export function Header() {
               >
                 {item.label}
                 {active && (
-                  <span className="absolute inset-x-4 -bottom-px h-[3px] rounded-full bg-[#FFB81C] sm:inset-x-2.5" />
+                  <span className="absolute inset-x-2 -bottom-px h-[3px] rounded-full bg-[#FFB81C] sm:inset-x-2.5" />
                 )}
               </Link>
             );
@@ -115,9 +116,9 @@ export function Header() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="KB의 생각 (새 창)"
-            className="flex min-h-[48px] items-center justify-center gap-0.5 px-0 text-gray-900 transition-opacity hover:opacity-70 active:bg-gray-50 sm:ml-auto sm:px-3"
+            className="flex min-h-[48px] items-center justify-center gap-0.5 px-2 text-gray-900 transition-opacity hover:opacity-70 active:bg-gray-50 sm:ml-auto sm:px-3"
           >
-            {/* 360px 폰의 칸(82px)에 마크 폭(63.6px)+화살표가 꽉 차므로 shrink-0 — 줄어들면 마크가 작아지고 중심도 어긋난다.
+            {/* 폰에서 네 항목 폭을 더하면 줄 폭에 가깝다 — shrink-0이 없으면 플렉스가 SVG를 줄여 마크가 작아지고 중심도 어긋난다.
                 마크 박스는 '생' 위의 점까지 포함해 글자 본체가 박스 중심보다 아래 — 2px 올려 탭 글자와 중심을 맞춘다 */}
             <KbThinkMark className="relative -top-[2px] h-[20px] w-auto shrink-0 max-[339px]:h-[17px]" />
             <ExternalIcon />
