@@ -11,6 +11,9 @@ export const maxDuration = 60;
 // 30분 크론이 새 기사만 훑으면 이력이 한 점밖에 쌓이지 않아 추이 차트를
 // 그릴 수 없다. 이 엔드포인트는 보관 중인 30일치를 전부 훑어 점을 채운다.
 const WINDOW_DAYS = 30;
+// 30일 전체를 한 번에 본문 부분 일치로 훑으면 4~9초가 걸려 8초 시간 한도에 걸렸다
+// (10/16·10/18 크론 실패 3건). 3일씩 나눠 조회한다 — 최근 3일 구간이 2초 남짓.
+const SLICE_DAYS = 3;
 const PAGE = 1000;
 const MAX_ROWS = 6000;
 
@@ -39,26 +42,39 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin();
-  const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
+  const nowMs = Date.now();
 
+  // 최신 구간부터 3일씩. 한 구간이 실패해도 나머지로 이력은 채우고(다음 실행이 메운다),
+  // 그때는 현재 값 갱신을 건너뛴다 — 최신 구간이 빠진 채로 "가장 최근 값"을 고르면 옛 값으로 되돌아간다.
   const rows: Row[] = [];
-  for (let from = 0; from < MAX_ROWS; from += PAGE) {
-    const { data, error } = await supabase
-      .from("articles")
-      .select("link,title,description,pub_date,source_host")
-      .gte("pub_date", since)
-      .or(KEYWORD_FILTER)
-      .order("pub_date", { ascending: false })
-      .range(from, from + PAGE - 1);
-    if (error) {
-      return NextResponse.json(
-        { error: "Failed to read articles", detail: error.message },
-        { status: 500 },
-      );
+  let failedSlices = 0;
+  let lastError: string | null = null;
+  for (let s = 0; s < WINDOW_DAYS && rows.length < MAX_ROWS; s += SLICE_DAYS) {
+    const until = new Date(nowMs - s * 86_400_000).toISOString();
+    const since = new Date(nowMs - Math.min(s + SLICE_DAYS, WINDOW_DAYS) * 86_400_000).toISOString();
+    for (let from = 0; rows.length < MAX_ROWS; from += PAGE) {
+      let query = supabase
+        .from("articles")
+        .select("link,title,description,pub_date,source_host")
+        .gte("pub_date", since);
+      // 최신 구간은 상한을 두지 않는다 — 발행 시각이 앞당겨 찍힌 기사도 예전처럼 포함
+      if (s > 0) query = query.lt("pub_date", until);
+      const { data, error } = await query
+        .or(KEYWORD_FILTER)
+        .order("pub_date", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) {
+        failedSlices += 1;
+        lastError = error.message;
+        break;
+      }
+      const page = (data ?? []) as Row[];
+      rows.push(...page);
+      if (page.length < PAGE) break;
     }
-    const page = (data ?? []) as Row[];
-    rows.push(...page);
-    if (page.length < PAGE) break;
+  }
+  if (failedSlices > 0 && rows.length === 0) {
+    return NextResponse.json({ error: "Failed to read articles", detail: lastError }, { status: 500 });
   }
 
   // 지표 × 날짜(KST) 단위로 하루 한 점만 남긴다 — 같은 수치의 중복 보도가 많다
@@ -118,7 +134,7 @@ export async function GET(request: NextRequest) {
     if (!cur || new Date(p.asOf) > new Date(cur.asOf)) latest.set(p.key, p);
   }
   let updated = 0;
-  for (const [key, p] of latest) {
+  for (const [key, p] of failedSlices > 0 ? [] : latest) {
     const { error } = await supabase
       .from("indicators")
       .update({
@@ -144,5 +160,6 @@ export async function GET(request: NextRequest) {
     perKey,
     inserted,
     updated,
+    ...(failedSlices ? { failedSlices, error: lastError } : {}),
   });
 }
