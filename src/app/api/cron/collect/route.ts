@@ -16,6 +16,8 @@ const PER_KEYWORD = 100;
 // 한 회차에 호출할 검색어 상한 — 분산 후 한 슬롯 최대치(T0 전부 + T1의 1/4 +
 // 하위 티어 몇 개)를 넉넉히 덮는다. 이 값에 걸려 잘리면 응답의 dropped에 남는다.
 const MAX_QUERIES_PER_RUN = 48;
+// articles upsert 한 번에 보낼 행 수 — 8초 문 시간 한도 안쪽으로
+const UPSERT_CHUNK = 250;
 
 type ArticleUpsert = {
   link: string;
@@ -177,20 +179,37 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
 
   let upsertedCount = 0;
-  if (rows.length > 0) {
-    const { error, count } = await supabase
-      .from("articles")
-      // 이미 있는 기사는 건드리지 않는다 — 30분마다 검색어당 최신 100건을 받으므로 대부분
-      // 기존 행인데, 그걸 매번 다시 써서 색인 12개를 갱신하는 것이 DB 부하의 대부분이었다
-      // (500행 upsert 한 번에 4초). 점수·묶음은 채점 크론이, 썸네일은 이미지 크론이 맡는다.
-      .upsert(rows, { onConflict: "link", ignoreDuplicates: true, count: "exact" });
-    if (error) {
-      return NextResponse.json(
-        { error: "Supabase upsert failed", detail: error.message },
-        { status: 500 },
-      );
+  let upsertFailedRows = 0;
+  let lastUpsertError: string | null = null;
+  // 이미 있는 기사는 건드리지 않는다 — 30분마다 검색어당 최신 100건을 받으므로 대부분
+  // 기존 행인데, 그걸 매번 다시 써서 색인 12개를 갱신하는 것이 DB 부하의 대부분이었다.
+  // 점수·묶음은 채점 크론이, 썸네일은 이미지 크론이 맡는다.
+  // 한 번에 몰아 쓰면 900행 upsert 가 평균 4초·최대 7초대로 8초 시간 한도에 걸려 수집 전체가
+  // 500 으로 끝났다(10/18). 나눠 쓰고, 실패한 묶음은 한 번 더 — 그래도 실패하면 건너뛴다
+  // (같은 기사는 다음 수집 때 네이버 최신 목록에 다시 잡힌다).
+  for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
+    const chunk = rows.slice(i, i + UPSERT_CHUNK);
+    let attempt = 0;
+    for (;;) {
+      const { error, count } = await supabase
+        .from("articles")
+        .upsert(chunk, { onConflict: "link", ignoreDuplicates: true, count: "exact" });
+      if (!error) {
+        upsertedCount += count ?? chunk.length;
+        break;
+      }
+      if (++attempt >= 2) {
+        upsertFailedRows += chunk.length;
+        lastUpsertError = error.message;
+        break;
+      }
     }
-    upsertedCount = count ?? rows.length;
+  }
+  if (rows.length > 0 && upsertFailedRows === rows.length) {
+    return NextResponse.json(
+      { error: "Supabase upsert failed", detail: lastUpsertError },
+      { status: 500 },
+    );
   }
 
   // 썸네일 채우기는 /api/cron/images가 따로 돈다
@@ -206,6 +225,7 @@ export async function GET(request: NextRequest) {
     fetched: fetchedCount,
     unique: rows.length,
     upserted: upsertedCount,
+    ...(upsertFailedRows ? { upsertFailedRows, upsertError: lastUpsertError } : {}),
     failures,
     ...(purgeError ? { warning: "Purge failed", detail: purgeError.message } : {}),
   });
