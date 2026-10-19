@@ -416,16 +416,21 @@ export async function GET(request: NextRequest) {
 
   let saved = 0;
   let deferred = 0;
-  const CHUNK = 500;
+  // 500행씩 쓰면 한 번에 6~7초(행마다 병합 트리거가 돈다)로 8초 문 시간 한도에 가까웠다 —
+  // 200행씩 나눠 2초대로, 실패한 묶음은 한 번 더 시도한다.
+  const CHUNK = 200;
+  const upsertOnce = async (chunk: Record<string, unknown>[]) => {
+    let { error } = await supabase.from("articles").upsert(chunk, { onConflict: "link" });
+    if (error) ({ error } = await supabase.from("articles").upsert(chunk, { onConflict: "link" }));
+    return error;
+  };
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
     if (Date.now() - startedAt > HARD_DEADLINE_MS) {
       deferred += rows.length - i;
       break;
     }
-    const { error: upErr } = await supabase
-      .from("articles")
-      .upsert(chunk, { onConflict: "link" });
+    const upErr = await upsertOnce(chunk);
     if (upErr) {
       return NextResponse.json(
         { error: "Score upsert failed", detail: upErr.message, saved },
@@ -443,7 +448,7 @@ export async function GET(request: NextRequest) {
       break;
     }
     const chunk = oldPayload.slice(i, i + CHUNK);
-    const { error: oldErr } = await supabase.from("articles").upsert(chunk, { onConflict: "link" });
+    const oldErr = await upsertOnce(chunk);
     if (oldErr) {
       return NextResponse.json(
         { error: "Backlog upsert failed", detail: oldErr.message, saved, oldSaved },
@@ -455,9 +460,7 @@ export async function GET(request: NextRequest) {
   let retagged = 0;
   for (let i = 0; i < retagPayload.length; i += CHUNK) {
     const chunk = retagPayload.slice(i, i + CHUNK);
-    const { error: rtErr } = await supabase
-      .from("articles")
-      .upsert(chunk, { onConflict: "link" });
+    const rtErr = await upsertOnce(chunk);
     if (rtErr) {
       return NextResponse.json(
         { error: "Retag upsert failed", detail: rtErr.message, saved, retagged },
